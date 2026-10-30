@@ -1,0 +1,25 @@
+name: PowerShell module Pages smoke test
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/powershell-module-pages*.yml'
+      - 'scripts/module_docs_*.ps1'
+      - 'scripts/module_docs_*.py'
+      - 'templates/powershell-module-docs/**'
+      - 'tests/test_powershell_module_pages_contract.py'
+      - 'tests/fixtures/SampleModule/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  module-docs:
+    uses: ./.github/workflows/powershell-module-pages.yml
+    with:
+      manifest-path: tests/fixtures/SampleModule/SampleModule.psd1
+      strict-help: true
+      publish: false
