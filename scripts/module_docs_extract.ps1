@@ -102,4 +102,4 @@ $destination = [IO.Path]::GetFullPath($OutputPath)
 $folder = [IO.Path]::GetDirectoryName($destination)
 [IO.Directory]::CreateDirectory($folder) | Out-Null
 $reference | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $destination -Encoding utf8
-Write-Host "Extracted $($commands.Count) commands from $($module.Name) $($module.Version)"
+Write-Output "Extracted $($commands.Count) commands from $($module.Name) $($module.Version)"
