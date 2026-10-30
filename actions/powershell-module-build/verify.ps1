@@ -28,4 +28,4 @@ $extra = @($actual | Where-Object { $expected -notcontains $_ })
 if ($missing.Count -or $extra.Count) {
     throw "Export mismatch: missing [$($missing -join ', ')], extra [$($extra -join ', ')]."
 }
-Write-Host "Isolated Import-Module verified: $ModuleName $Version, exports [$($actual -join ', ')]"
+Write-Output "Isolated Import-Module verified: $ModuleName $Version, exports [$($actual -join ', ')]"
