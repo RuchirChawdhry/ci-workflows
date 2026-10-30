@@ -105,7 +105,8 @@ def test_existing_platyps_markdown_can_supply_authored_help(tmp_path):
     (authored / "Get-Greeting.md").write_text(
         "# Get-Greeting\n\n## SYNOPSIS\n\nGreets somebody.\n\n"
         "## DESCRIPTION\n\nA detailed, authored explanation.\n\n"
-        "## EXAMPLES\n\n### Example 1\n\n```powershell\nGet-Greeting -Name World\n```\n"
+        "## EXAMPLES\n\n### Example 1\n\n```powershell\nGet-Greeting -Name World\n```\n\n"
+        "## PARAMETERS\n\n### -Name\n\nPerson to greet.\n"
     )
     build_site(input_file, tmp_path / "site", authored=authored, strict=True)
     ref = (tmp_path / "site/src/content/docs/reference/get-greeting.md").read_text()
@@ -119,3 +120,17 @@ def test_renderer_rejects_unsafe_command_names(tmp_path):
     p.write_text(json.dumps(d))
     with pytest.raises(ValueError):
         build_site(p, tmp_path / "site", strict=False)
+
+
+def test_strict_platyps_override_cannot_hide_missing_public_parameter(tmp_path):
+    d = sample(helpful=False)
+    p = tmp_path / "reference.json"
+    p.write_text(json.dumps(d))
+    authored = tmp_path / "docs"
+    authored.mkdir()
+    (authored / "Get-Greeting.md").write_text(
+        "## SYNOPSIS\nGreets somebody.\n## DESCRIPTION\nDetailed explanation.\n"
+        "## EXAMPLES\n### Example 1\n```powershell\nGet-Greeting -Name World\n```\n"
+    )
+    with pytest.raises(ValueError, match="Get-Greeting"):
+        build_site(p, tmp_path / "site", authored=authored, strict=True)
