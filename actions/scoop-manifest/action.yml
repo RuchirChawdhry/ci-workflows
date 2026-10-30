@@ -1,0 +1,65 @@
+name: Generate Scoop manifest
+description: Generate a portable .exe Scoop manifest from the tested release artifact.
+inputs:
+  asset-path:
+    description: Path of the built portable Windows executable
+    required: true
+  app-name:
+    description: Lowercase Scoop package name
+    required: true
+  version:
+    description: Release version, without v prefix
+    required: true
+  release-url:
+    description: HTTPS URL that will serve identical public release bytes
+    required: true
+  description:
+    description: Short project description
+    default: ''
+  homepage:
+    description: HTTPS project homepage; GitHub homepage enables checkver
+    default: ''
+  license:
+    description: Actual project license, if known
+    default: ''
+  binary-name:
+    description: Executable filename to expose (defaults to asset filename)
+    default: ''
+  output-dir:
+    description: Output directory
+    default: scoop-output
+outputs:
+  manifest-path:
+    description: Generated Scoop manifest path
+    value: ${{ steps.generate.outputs.manifest-path }}
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      with:
+        version: latest-known
+        enable-cache: false
+    - name: Generate release manifest
+      id: generate
+      shell: pwsh
+      env:
+        ASSET_PATH: ${{ inputs.asset-path }}
+        APP_NAME: ${{ inputs.app-name }}
+        APP_VERSION: ${{ inputs.version }}
+        RELEASE_URL: ${{ inputs.release-url }}
+        APP_DESCRIPTION: ${{ inputs.description }}
+        APP_HOMEPAGE: ${{ inputs.homepage }}
+        APP_LICENSE: ${{ inputs.license }}
+        BINARY_NAME: ${{ inputs.binary-name }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $path = Join-Path $env:OUTPUT_DIR "$($env:APP_NAME).json"
+        uv run --no-project --python 3.14.7 python (Join-Path $env:GITHUB_ACTION_PATH 'generate.py') `
+          --asset $env:ASSET_PATH --output $path --app-name $env:APP_NAME `
+          --version $env:APP_VERSION --release-url $env:RELEASE_URL `
+          --description $env:APP_DESCRIPTION --homepage $env:APP_HOMEPAGE `
+          --license $env:APP_LICENSE --binary-name $env:BINARY_NAME
+        if ($LASTEXITCODE -ne 0) { throw 'Manifest generation failed.' }
+        "manifest-path=$((Resolve-Path -LiteralPath $path).Path)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
