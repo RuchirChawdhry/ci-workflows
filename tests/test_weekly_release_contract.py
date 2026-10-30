@@ -139,6 +139,9 @@ def test_previous_release_must_be_ancestor(tmp_path):
     mod = load_script()
     repository(tmp_path)
     assert not mod.has_changes(tmp_path, "weekly-2026-10-25", "HEAD")
+    (tmp_path / "tests/test_example.py").write_text("assert False\\n")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-qm", "second commit")
     with pytest.raises(ValueError, match="ancestor"):
         mod.has_changes(tmp_path, "HEAD", "weekly-2026-10-25")
 
