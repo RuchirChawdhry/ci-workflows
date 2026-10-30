@@ -12,6 +12,8 @@ A growing collection of reusable GitHub Actions workflows and composite actions 
 
 I built this repository to keep my projects consistent without maintaining the same pipelines everywhere. It's designed to be lightweight, modular, and easy for anyone to reuse.
 
+Python workflows intentionally use **uv** throughout. This is an opinionated toolkit, not a package-manager abstraction.
+
 ## What's inside?
 
 - **Reusable workflows:** Complete CI/CD jobs that can be called directly from other repositories.
