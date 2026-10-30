@@ -34,7 +34,10 @@ def markdown(report):
              "| Python | Result | Failed stage | Diagnostic |",
              "|---|---|---|---|"]
     for entry in report["results"]:
-        reason = str(entry.get("reason", "")).splitlines()[0].replace("|", "\\|")[:150]
+        diagnostic = str(entry.get("reason", "")).strip().splitlines()
+        # The final traceback line contains the exception; the first is only a heading.
+        message = diagnostic[-1] if diagnostic and diagnostic[0].startswith("Traceback") else (diagnostic[0] if diagnostic else "")
+        reason = message.strip().replace("|", "\\|")[:150]
         lines.append(f"| {entry['version']} | {entry['status']} | {entry.get('failed_stage') or '—'} | {reason} |")
     lines.extend(["",
                   f"**Lowest tested passing version:** {report['lowest_passing'] or 'None'}",
