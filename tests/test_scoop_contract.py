@@ -76,3 +76,8 @@ def test_local_install_does_not_mutate_remote_manifest(tmp_path):
     assert tested["hash"] == original["hash"]
     assert tested["url"] == "http://127.0.0.1:3131/markbox.exe"
     assert original["url"].startswith("https://")
+
+def test_scoop_help_argument_survives_leading_dashes():
+    action = parse("actions/scoop-test/action.yml")
+    script = "\n".join(step.get("run", "") for step in action["runs"]["steps"])
+    assert "--help-argument=$env:HELP_ARGUMENT" in script
