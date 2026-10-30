@@ -4,7 +4,7 @@ $current = $PSVersionTable.PSVersion
 if ($current -lt [version]$env:MIN_PS_VERSION) {
     throw "PowerShell $($env:MIN_PS_VERSION) or newer required; found $current."
 }
-Write-Host "PowerShell $current (minimum 7.6.9 by default)"
+Write-Output "PowerShell $current (minimum 7.6.9 by default)"
 
 $files = @(Get-ChildItem -LiteralPath . -Recurse -File |
     Where-Object Extension -In '.ps1', '.psm1', '.psd1')
@@ -15,7 +15,7 @@ foreach ($file in $files) {
         $file.FullName, [ref]$tokens, [ref]$errors
     )
     foreach ($issue in $errors) {
-        Write-Host "::error file=$($file.FullName),line=$($issue.Extent.StartLineNumber)::$($issue.Message)"
+        Write-Output "::error file=$($file.FullName),line=$($issue.Extent.StartLineNumber)::$($issue.Message)"
     }
     if ($errors.Count) { throw "PowerShell syntax error: $($file.FullName)" }
 }
@@ -26,7 +26,7 @@ $issues = @(foreach ($file in $files) {
     Invoke-ScriptAnalyzer -Path $file.FullName -Severity Error,Warning
 })
 foreach ($issue in $issues) {
-    Write-Host "::error file=$($issue.ScriptName),line=$($issue.Line)::$($issue.Message)"
+    Write-Output "::error file=$($issue.ScriptName),line=$($issue.Line)::$($issue.Message)"
 }
 if ($issues.Count) { throw "$($issues.Count) PSScriptAnalyzer issues found." }
 
@@ -37,7 +37,7 @@ if (-not $testFiles.Count) {
     if ([bool]::Parse($env:REQUIRE_TESTS)) {
         throw "Pester tests are required but none were found in $($env:TEST_PATH)."
     }
-    Write-Host 'No Pester tests; optional test stage skipped.'
+    Write-Output 'No Pester tests; optional test stage skipped.'
     return
 }
 
