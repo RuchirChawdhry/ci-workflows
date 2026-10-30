@@ -1,0 +1,69 @@
+name: Astro GitHub Pages
+
+on:
+  workflow_call:
+    inputs:
+      site-path:
+        description: Astro project root, relative to the caller repository
+        type: string
+        default: '.'
+      node-version:
+        description: Node.js version to build with
+        type: string
+        default: '24'
+      package-manager:
+        description: Optional explicit package manager; otherwise detect from lockfile
+        type: string
+        default: ''
+      out-dir:
+        description: Astro build output directory, relative to site-path
+        type: string
+        default: dist
+      publish:
+        description: Deploy to GitHub Pages after building
+        type: boolean
+        default: false
+      deploy-branch:
+        description: Authorized deployment branch; environment rules should also enforce this
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Astro site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout project source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build Astro and upload Pages artifact
+        uses: withastro/action@a8b97df764791eb61fbf3338ef713b0e61ae05c5 # v6
+        with:
+          path: ${{ inputs.site-path }}
+          node-version: ${{ inputs.node-version }}
+          package-manager: ${{ inputs.package-manager }}
+          out-dir: ${{ inputs.out-dir }}
+
+  deploy:
+    name: Publish GitHub Pages
+    needs: build
+    if: ${{ inputs.publish && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', inputs.deploy-branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy validated Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

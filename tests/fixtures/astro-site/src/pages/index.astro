@@ -1,0 +1,18 @@
+---
+const headline = "Astro Pages smoke test";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{headline}</title>
+  </head>
+  <body>
+    <main>
+      <h1>{headline}</h1>
+      <p>A tiny Astro site for checking reusable build-only GitHub Actions.</p>
+      <a href={import.meta.env.BASE_URL}>Home</a>
+    </main>
+  </body>
+</html>
