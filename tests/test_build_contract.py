@@ -26,11 +26,11 @@ def test_build_checks_metadata_and_artifacts():
     assert 'uv build' in blob and '--sdist' in blob and '--wheel' in blob
     assert 'twine check --strict' in blob
     assert any('actions/upload-artifact@' in step.get('uses', '') and step['with']['if-no-files-found'] == 'error' for step in steps)
-    assert any(step.get('uses') == '$/.github/actions/test-python-cli' for step in steps)
+    assert any(step.get('uses') == '$/actions/test-python-cli' for step in steps)
 
 
 def test_install_smoke_uses_isolated_wheel_not_local_sources():
-    action = load('.github/actions/test-python-cli/action.yml')
+    action = load('actions/test-python-cli/action.yml')
     assert action['runs']['using'] == 'composite'
     script = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
     assert 'uv venv' in script
@@ -46,3 +46,17 @@ def test_fixture_is_real_installable_cli():
     project = loads((fixture / 'pyproject.toml').read_text())
     assert project['project']['scripts']['workflow-hello'] == 'hello_cli.cli:main'
     assert (fixture / 'src/hello_cli/cli.py').is_file()
+
+
+def test_action_is_top_level_and_old_path_is_gone():
+    assert (ROOT / 'actions/test-python-cli/action.yml').is_file()
+    assert not (ROOT / '.github/actions/test-python-cli/action.yml').exists()
+
+
+def test_python_toolchain_is_intentionally_uv_only():
+    workflow = load('.github/workflows/python-build.yml')
+    action = load('actions/test-python-cli/action.yml')
+    steps = workflow['jobs']['build']['steps']
+    assert any('astral-sh/setup-uv@' in step.get('uses', '') for step in steps)
+    assert any('uv build' in step.get('run', '') for step in steps)
+    assert all('uv pip install' in step.get('run', '') for step in action['runs']['steps'])

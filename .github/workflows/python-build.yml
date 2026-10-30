@@ -71,7 +71,7 @@ jobs:
           uvx --from twine twine check --strict "${wheels[0]}" "${sdists[0]}"
       - name: Test installed CLI
         if: ${{ inputs.cli-command != '' }}
-        uses: $/.github/actions/test-python-cli
+        uses: $/actions/test-python-cli
         with:
           cli-command: ${{ inputs.cli-command }}
           python-version: ${{ inputs.python-version }}
