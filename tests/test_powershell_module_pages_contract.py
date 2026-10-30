@@ -103,9 +103,9 @@ def test_existing_platyps_markdown_can_supply_authored_help(tmp_path):
     authored = tmp_path / "docs"
     authored.mkdir()
     (authored / "Get-Greeting.md").write_text(
-        "# Get-Greeting\\n\\n## SYNOPSIS\\n\\nGreets somebody.\\n\\n"
-        "## DESCRIPTION\\n\\nA detailed, authored explanation.\\n\\n"
-        "## EXAMPLES\\n\\n### Example 1\\n\\n```powershell\\nGet-Greeting -Name World\\n```\\n"
+        "# Get-Greeting\n\n## SYNOPSIS\n\nGreets somebody.\n\n"
+        "## DESCRIPTION\n\nA detailed, authored explanation.\n\n"
+        "## EXAMPLES\n\n### Example 1\n\n```powershell\nGet-Greeting -Name World\n```\n"
     )
     build_site(input_file, tmp_path / "site", authored=authored, strict=True)
     ref = (tmp_path / "site/src/content/docs/reference/get-greeting.md").read_text()
