@@ -1,0 +1,46 @@
+name: Weekly release bundle dry run
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/weekly-release.yml'
+      - '.github/workflows/weekly-release-smoke.yml'
+      - 'scripts/weekly_release.py'
+      - 'tests/test_weekly_release_contract.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-slim
+    timeout-minutes: 14
+    steps:
+      - name: Check out current commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
+      - name: Verify real repository archive
+        run: |
+          set -euo pipefail
+          uv run --no-project --python 3.14.7 python scripts/weekly_release.py \
+            build --ref "$GITHUB_SHA" --tag weekly-2000-01-01 \
+            --output-dir dist/weekly-dry-run
+          cd dist/weekly-dry-run
+          sha256sum --check SHA256SUMS.txt
+          unzip -Z -1 ci-workflows-weekly-2000-01-01.zip | head -n 30
+      - name: Upload candidate ZIP for review
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: weekly-release-dry-run
+          path: |
+            dist/weekly-dry-run/*.zip
+            dist/weekly-dry-run/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
