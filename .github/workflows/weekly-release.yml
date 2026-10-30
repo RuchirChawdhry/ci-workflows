@@ -62,6 +62,12 @@ jobs:
               --github-output "$GITHUB_OUTPUT"
           fi
 
+      - name: Validate repository contract tests
+        if: steps.decide.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          uv run --no-project --python 3.14.7 --with pytest --with PyYAML pytest -q tests
+
       - name: Build and verify snapshot archive
         if: steps.decide.outputs.changed == 'true'
         env:
