@@ -51,6 +51,8 @@ def test_site_does_not_invent_release_features():
                  "pages-astro.yml"):
         assert (ROOT / ".github/workflows" / path).exists()
         assert path in cards
+    assert "PowerShell Module Docs" in cards
+    assert "powershell-module-pages.yml" in cards
     assert "workflows" in page.lower()
     assert "pypi publishing" not in page.lower()
 

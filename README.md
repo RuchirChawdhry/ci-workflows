@@ -31,7 +31,7 @@ Python workflows intentionally use **uv** throughout. This is an opinionated too
 | Packaging | Scoop, build artifacts, GitHub Releases |
 | Security | Actionlint, Zizmor, Semgrep |
 | Automation | Testing, linting, publishing, release pipelines |
-| Websites | [Astro GitHub Pages](docs/pages-astro.md), PR build validation, protected deployment |
+| Websites | [Astro GitHub Pages](docs/pages-astro.md), [PowerShell module documentation](docs/powershell-module-pages.md), protected deployment |
 
 ## Getting started
 

@@ -41,6 +41,7 @@ export default defineConfig({
             { slug: 'docs/workflows/python-build' },
             { slug: 'docs/workflows/python-compat' },
             { slug: 'docs/workflows/powershell' },
+            { slug: 'docs/workflows/powershell-module-pages' },
             { slug: 'docs/workflows/scoop' },
             { slug: 'docs/workflows/homebrew' },
             { slug: 'docs/workflows/astro-pages' },
