@@ -32,7 +32,7 @@ def test_checks_are_reused_by_old_script_ci():
     assert "TestResult.OutputFormat" in source
     assert "JUnitXml" in source
     assert "PSScriptAnalyzer" in source
-    assert "Pester" in source
+    assert "Pester" in (ROOT / "actions/powershell-checks/pester.ps1").read_text()
     assert "RequireTests" in source
     assert "7.6.9" in source
 
@@ -72,3 +72,11 @@ def test_minimum_runtime_is_actually_provisioned():
     build = read("actions/powershell-module-build/action.yml")
     build_steps = "\n".join(s.get("run", "") for s in build["runs"]["steps"])
     assert "pwsh -NoProfile -NonInteractive -File" in build_steps
+
+def test_static_analysis_and_pester_run_in_separate_processes():
+    action = read("actions/powershell-checks/action.yml")
+    runs = "\n".join(s.get("run","") for s in action["runs"]["steps"])
+    assert "pwsh -NoProfile -NonInteractive -File" in runs
+    assert "pester.ps1" in runs and "check.ps1" in runs
+    static = (ROOT / "actions/powershell-checks/check.ps1").read_text()
+    assert "Import-Module Pester" not in static
