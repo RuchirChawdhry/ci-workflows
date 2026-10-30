@@ -1,0 +1,92 @@
+name: Weekly release bundle
+
+on:
+  schedule:
+    # Sunday, 09:00 IST (03:30 UTC)
+    - cron: '30 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-release-bundle
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-slim
+    timeout-minutes: 14
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the exact commit and previous tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
+      - name: Decide whether a snapshot is needed
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="weekly-$(date -u +%F)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists. Skipping."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          published="$(gh release list --repo "$GITHUB_REPOSITORY" \
+            --limit 100 --json tagName,isDraft \
+            --jq '.[] | select(.isDraft == false) | .tagName')"
+          previous="$(printf '%s\n' "$published" |
+            grep -E '^weekly-[0-9]{4}-[0-9]{2}-[0-9]{2}$' | head -n 1 || true)"
+
+          if [[ -z "$previous" ]]; then
+            echo "No previous weekly release; generating initial bundle."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Comparing included files with $previous."
+            uv run --no-project --python 3.14.7 python scripts/weekly_release.py \
+              changed --previous "$previous" --ref "$GITHUB_SHA" \
+              --github-output "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and verify snapshot archive
+        if: steps.decide.outputs.changed == 'true'
+        env:
+          SNAPSHOT_TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          set -euo pipefail
+          uv run --no-project --python 3.14.7 python scripts/weekly_release.py \
+            build --tag "$SNAPSHOT_TAG" --ref "$GITHUB_SHA" \
+            --output-dir dist/weekly
+          cd dist/weekly
+          sha256sum --check SHA256SUMS.txt
+
+      - name: Publish weekly GitHub Release
+        if: steps.decide.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$SNAPSHOT_TAG" \
+            "dist/weekly/ci-workflows-$SNAPSHOT_TAG.zip" \
+            dist/weekly/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Weekly snapshot $SNAPSHOT_TAG" \
+            --notes "Automated snapshot of .github/workflows/, actions/, assets/, README.md and LICENSE. Published only when included files differ from the previous weekly release." \
+            --generate-notes \
+            --latest
