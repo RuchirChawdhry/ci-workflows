@@ -1,0 +1,142 @@
+name: PowerShell module documentation
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        description: Relative path to the module .psd1 manifest
+        type: string
+        required: true
+      docs-path:
+        description: Optional directory with authored PlatyPS command Markdown and guides/
+        type: string
+        default: docs
+      strict-help:
+        description: Fail if exported commands lack meaningful help
+        type: boolean
+        default: true
+      publish:
+        description: Opt into GitHub Pages deployment after a successful build
+        type: boolean
+        default: false
+      deploy-branch:
+        description: Only this branch may deploy
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    name: Extract PowerShell API
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout consuming module repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout shared implementation at called workflow SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-workflows
+          persist-credentials: false
+      - name: Extract module help into a normalized API snapshot
+        shell: pwsh
+        env:
+          MANIFEST_PATH: ${{ inputs.manifest-path }}
+        run: |
+          & ./.ci-workflows/scripts/module_docs_extract.ps1 -ManifestPath $env:MANIFEST_PATH -OutputPath api/reference.json
+      - name: Upload reference JSON artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: powershell-module-api
+          path: api/reference.json
+          if-no-files-found: error
+          retention-days: 7
+
+  build:
+    name: Build documentation-only Starlight site
+    needs: extract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout consumer source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout shared implementation at called workflow SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-workflows
+          persist-credentials: false
+      - name: Download API snapshot from extraction job
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: powershell-module-api
+          path: api
+      - name: Prepare shared Starlight template and render reference
+        env:
+          DOCS_PATH: ${{ inputs.docs-path }}
+          STRICT_HELP: ${{ inputs.strict-help }}
+        run: |
+          set -euo pipefail
+          SITE="$RUNNER_TEMP/powershell-docs-site"
+          mkdir -p "$SITE"
+          cp -R .ci-workflows/templates/powershell-module-docs/. "$SITE/"
+          cp .ci-workflows/website/package.json "$SITE/package.json"
+          cp .ci-workflows/website/package-lock.json "$SITE/package-lock.json"
+          python3 .ci-workflows/scripts/module_docs_render.py \
+            --reference api/reference.json \
+            --site "$SITE" \
+            --authored "$GITHUB_WORKSPACE/$DOCS_PATH" \
+            --strict "$STRICT_HELP"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repository="${GITHUB_REPOSITORY#*/}"
+          base="/$repository"
+          if [ "$repository" = "$owner.github.io" ]; then base="/"; fi
+          title="$(python3 -c 'import json; print(json.load(open("api/reference.json"))["module"]["name"])')"
+          {
+            echo "DOCS_SITE=https://$owner.github.io"
+            echo "DOCS_BASE=$base"
+            echo "DOCS_TITLE=$title"
+          } >> "$GITHUB_ENV"
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Build Starlight site with pinned Astro dependencies
+        run: |
+          set -euo pipefail
+          npm ci --prefix "$RUNNER_TEMP/powershell-docs-site" --no-audit --no-fund
+          npm --prefix "$RUNNER_TEMP/powershell-docs-site" run build
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ runner.temp }}/powershell-docs-site/dist
+
+  deploy:
+    name: Deploy PowerShell module documentation
+    needs: build
+    if: ${{ inputs.publish && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', inputs.deploy-branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy verified Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
