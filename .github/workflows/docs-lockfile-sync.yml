@@ -1,0 +1,39 @@
+name: Temporary Starlight lockfile sync
+
+on:
+  pull_request:
+    paths:
+      - 'website/package.json'
+      - '.github/workflows/docs-lockfile-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/docs-starlight' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Resolve and commit full dependency lockfile on this feature branch
+        run: |
+          set -euo pipefail
+          cd website
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          cd ..
+          if git diff --quiet -- website/package-lock.json; then
+            echo "Lockfile already up-to-date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add website/package-lock.json
+          git commit -m "chore: resolve Starlight and Astro package lock"
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
