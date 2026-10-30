@@ -1,0 +1,68 @@
+name: Generate Homebrew formula
+description: Verify a portable macOS archive and generate an exact-checksum personal-tap formula.
+inputs:
+  archive-path:
+    description: Archive containing exactly one root-level executable
+    required: true
+  app-name:
+    description: Formula name
+    required: true
+  version:
+    description: Release version without v prefix
+    required: true
+  release-url:
+    description: Final public HTTPS URL containing identical released bytes
+    required: true
+  homepage:
+    description: HTTPS project homepage
+    required: true
+  description:
+    description: CLI description
+    required: true
+  license:
+    description: SPDX license identifier (optional)
+    default: ''
+  binary-name:
+    description: Executable name (defaults to app-name)
+    default: ''
+  architecture:
+    description: x86_64 or arm64
+    default: x86_64
+  output-dir:
+    description: Root directory for Formula/name.rb
+    default: homebrew-output
+outputs:
+  formula-path:
+    description: Path to generated Ruby formula
+    value: ${{ steps.generate.outputs.formula-path }}
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      with:
+        version: latest-known
+        enable-cache: false
+    - name: Generate formula
+      id: generate
+      shell: bash
+      env:
+        ARCHIVE: ${{ inputs.archive-path }}
+        APP_NAME: ${{ inputs.app-name }}
+        VERSION: ${{ inputs.version }}
+        RELEASE_URL: ${{ inputs.release-url }}
+        APP_DESCRIPTION: ${{ inputs.description }}
+        HOMEPAGE: ${{ inputs.homepage }}
+        LICENSE: ${{ inputs.license }}
+        BINARY_NAME: ${{ inputs.binary-name }}
+        ARCHITECTURE: ${{ inputs.architecture }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        set -euo pipefail
+        output="$OUTPUT_DIR/Formula/$APP_NAME.rb"
+        uv run --no-project --python 3.14.7 python "$GITHUB_ACTION_PATH/generate.py" \
+          --archive "$ARCHIVE" --output "$output" --app-name "$APP_NAME" \
+          --version "$VERSION" --release-url "$RELEASE_URL" \
+          --description "$APP_DESCRIPTION" --homepage "$HOMEPAGE" \
+          --license "$LICENSE" --binary-name "$BINARY_NAME" --architecture "$ARCHITECTURE"
+        echo "formula-path=$(realpath "$output")" >> "$GITHUB_OUTPUT"
