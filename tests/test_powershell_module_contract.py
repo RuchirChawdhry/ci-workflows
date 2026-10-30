@@ -61,3 +61,14 @@ def test_sample_is_real_module_with_tests():
     assert "pull_request" in smoke["on"]
     assert any(".github/workflows/powershell-module.yml" in s.get("uses", "")
                for s in smoke["jobs"].values())
+
+def test_minimum_runtime_is_actually_provisioned():
+    setup = read("actions/powershell-checks/action.yml")
+    commands = "\n".join(s.get("run", "") for s in setup["runs"]["steps"])
+    assert "PowerShell-7.6.9-win-x64.zip" in commands
+    assert "CE7484804C0F0AD4DDA10C958E71ACDAF7EEBFB22505C1B480F89E0E9F1DA94D" in commands
+    assert "GITHUB_PATH" in commands
+    assert "pwsh -NoProfile -NonInteractive -File" in commands
+    build = read("actions/powershell-module-build/action.yml")
+    build_steps = "\n".join(s.get("run", "") for s in build["runs"]["steps"])
+    assert "pwsh -NoProfile -NonInteractive -File" in build_steps
