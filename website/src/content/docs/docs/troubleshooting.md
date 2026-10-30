@@ -17,7 +17,7 @@ Check that `pyproject.toml` declares its dependencies and dev group. The Python 
 
 ## A Python version is UNSUPPORTED
 
-That is the package's declared `requires-python` constraint, not necessarily a code error. Run the [Compatibility Explorer](./workflows/python-compat/) with `explore-unsupported: true` to test an isolated copy. Inspect the JSON artifact for dependency and source errors.
+That is the package's declared `requires-python` constraint, not necessarily a code error. Run the [Compatibility Explorer](../workflows/python-compat/) with `explore-unsupported: true` to test an isolated copy. Inspect the JSON artifact for dependency and source errors.
 
 ## Packaging validation succeeds, but installation from the published release fails
 

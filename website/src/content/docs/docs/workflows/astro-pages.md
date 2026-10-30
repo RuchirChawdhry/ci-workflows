@@ -27,7 +27,7 @@ jobs:
     uses: RuchirChawdhry/ci-workflows/.github/workflows/pages-astro.yml@main
     with:
       site-path: website
-      publish: \${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+      publish: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
 ```
 
 The `publish` flag defaults to **false**, so a caller must explicitly opt into publishing. The central deploy job also guards against PR events and non-`main` branches. Restrict the `github-pages` environment to the intended deployment branch.

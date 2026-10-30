@@ -9,14 +9,14 @@ export default defineConfig({
     starlight({
       title: 'ci-workflows Docs',
       description: 'Reusable CI/CD workflows: build, test, package, and deploy with less YAML.',
-      favicon: '/ci-workflows/favicon.svg',
+      favicon: '/favicon.svg',
       customCss: ['./src/styles/starlight.css'],
       pagefind: true,
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/RuchirChawdhry/ci-workflows' },
       ],
       editLink: {
-        baseUrl: 'https://github.com/RuchirChawdhry/ci-workflows/edit/main/website/src/content/docs/',
+        baseUrl: 'https://github.com/RuchirChawdhry/ci-workflows/edit/main/website/',
       },
       sidebar: [
         { label: 'ci-workflows website', link: 'https://ruchirchawdhry.github.io/ci-workflows/' },

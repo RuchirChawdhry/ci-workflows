@@ -7,7 +7,7 @@ The smallest integration is a caller YAML file in the repository you want to val
 
 ## 1. Choose a workflow
 
-For a Python CLI that already has a `pyproject.toml`, start with [Python CLI](./workflows/python-cli/).
+For a Python CLI that already has a `pyproject.toml`, start with [Python CLI](../workflows/python-cli/).
 
 Create `.github/workflows/ci.yml` in **your** repository:
 
@@ -41,12 +41,12 @@ Push the caller file. GitHub Actions will start on the configured event. Open it
 
 ## 3. Choose the next building block
 
-- [Build wheels and source distributions](./workflows/python-build/)
-- [Explore Python version support](./workflows/python-compat/)
-- [Deploy an Astro website](./workflows/astro-pages/)
+- [Build wheels and source distributions](../workflows/python-build/)
+- [Explore Python version support](../workflows/python-compat/)
+- [Deploy an Astro website](../workflows/astro-pages/)
 
 ## What stays in your repository?
 
 Your project retains its tests, dependencies, source, caller workflow, permissions, and branch rules. The shared workflow supplies standard execution logic.
 
-**Need help?** See [Troubleshooting](./troubleshooting/).
+**Need help?** See [Troubleshooting](../troubleshooting/).

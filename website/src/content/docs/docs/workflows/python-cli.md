@@ -40,4 +40,4 @@ The shared [`python-checks` composite action](https://github.com/RuchirChawdhry/
 This workflow performs **checks only**. It does not publish to PyPI or create a release.
 :::
 
-For broader interpreter discovery, see the [Compatibility Explorer](./python-compat/).
+For broader interpreter discovery, see the [Compatibility Explorer](../python-compat/).
