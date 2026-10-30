@@ -46,7 +46,9 @@ Missing matrix results appear as INFRA, never as an unsupported Python version.
 - Defaults to CPython 3.6–3.15 on Linux, in groups of up to four parallel jobs.
 - Pass exact patch versions such as 3.12.4 for finer investigation.
 - Passing under Linux is not evidence of Windows or macOS compatibility.
-- By default, requires-python is respected. With explore-unsupported: true, the workflow\n  relaxes only that field in a disposable copy and labels any passing result EXPERIMENTAL_PASS.\n  The original repository and package metadata remain untouched.
+- By default, requires-python is respected. With explore-unsupported: true, the workflow
+  relaxes only that field in a disposable copy and labels any passing result EXPERIMENTAL_PASS.
+  The original repository and package metadata remain untouched.
 - Complex dependency resolution failures retain uv diagnostics, but automatic identification of the root offending dependency is best-effort.
 - This first version does not test PyPy or other operating systems.
 - No tests directory is explicitly marked as skipped. A PASS is not an official support promise.
