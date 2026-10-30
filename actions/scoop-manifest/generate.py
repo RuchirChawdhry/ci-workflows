@@ -9,8 +9,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 APP_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
-VERSION_RE = re.compile(r"^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:[-.+][a-zA-Z0-9.-]+)?$")
-BIN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\\.exe$", re.I)
+VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-.+][a-zA-Z0-9.-]+)?$")
+BIN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.exe$", re.I)
 
 def generate_manifest(*, asset: Path, output: Path, app_name: str, version: str,
                       release_url: str, description: str, homepage: str,
