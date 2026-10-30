@@ -1,0 +1,32 @@
+name: Build and verify a PowerShell module
+description: Stage a manifest-based PowerShell module, ZIP it, and verify import and exports after extraction.
+inputs:
+  manifest-path:
+    description: Path to source module manifest (.psd1)
+    required: true
+  output-dir:
+    description: Directory for final module ZIP
+    default: dist
+outputs:
+  module-zip:
+    description: Absolute ZIP path
+    value: ${{ steps.package.outputs.module-zip }}
+  module-name:
+    description: Name derived from manifest
+    value: ${{ steps.package.outputs.module-name }}
+  module-version:
+    description: ModuleVersion from manifest
+    value: ${{ steps.package.outputs.module-version }}
+runs:
+  using: composite
+  steps:
+    - name: Stage, package and independently import module
+      id: package
+      shell: pwsh
+      env:
+        MANIFEST_PATH: ${{ inputs.manifest-path }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        & pwsh -NoProfile -NonInteractive -File (Join-Path $env:GITHUB_ACTION_PATH 'build.ps1') -ManifestPath $env:MANIFEST_PATH -OutputDir $env:OUTPUT_DIR
+        if ($LASTEXITCODE -ne 0) { throw 'Module packaging failed.' }

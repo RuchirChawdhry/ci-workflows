@@ -1,0 +1,62 @@
+name: PowerShell quality checks
+description: Syntax, PSScriptAnalyzer and Pester checks for PowerShell scripts and modules.
+inputs:
+  minimum-powershell-version:
+    description: Minimum PowerShell 7 version
+    default: '7.6.9'
+  test-path:
+    description: Path containing Pester *.Tests.ps1 files
+    default: tests
+  require-tests:
+    description: Fail if no Pester tests exist
+    default: 'false'
+  results-path:
+    description: Relative path to JUnit XML report
+    default: reports/pester.xml
+runs:
+  using: composite
+  steps:
+    - name: Provision PowerShell 7.6.9 if runner is outdated
+      shell: pwsh
+      env:
+        MIN_PS_VERSION: ${{ inputs.minimum-powershell-version }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        if ($PSVersionTable.PSVersion -lt [version]$env:MIN_PS_VERSION) {
+          if (-not $IsWindows -or $env:MIN_PS_VERSION -ne '7.6.9') {
+            throw "Automatic provisioning currently supports Windows and PowerShell 7.6.9 only."
+          }
+          $filename = 'PowerShell-7.6.9-win-x64.zip'
+          $expected = 'CE7484804C0F0AD4DDA10C958E71ACDAF7EEBFB22505C1B480F89E0E9F1DA94D'
+          $archive = Join-Path $env:RUNNER_TEMP $filename
+          $directory = Join-Path $env:RUNNER_TEMP 'powershell-7.6.9'
+          Invoke-WebRequest -Uri "https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/$filename" -OutFile $archive
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+          if ($actual -ne $expected) { throw "PowerShell archive SHA-256 mismatch: $actual" }
+          Expand-Archive -LiteralPath $archive -DestinationPath $directory -Force
+          $exe = Join-Path $directory 'pwsh.exe'
+          & $exe -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          if ($LASTEXITCODE -ne 0) { throw 'Portable pwsh could not start.' }
+          $directory | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        }
+    - name: Check PowerShell code
+      shell: pwsh
+      env:
+        MIN_PS_VERSION: ${{ inputs.minimum-powershell-version }}
+        TEST_PATH: ${{ inputs.test-path }}
+        REQUIRE_TESTS: ${{ inputs.require-tests }}
+        RESULTS_PATH: ${{ inputs.results-path }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        & pwsh -NoProfile -NonInteractive -File (Join-Path $env:GITHUB_ACTION_PATH 'check.ps1')
+        if ($LASTEXITCODE -ne 0) { throw 'PowerShell quality checks failed.' }
+    - name: Run Pester 6 in clean PowerShell interpreter
+      shell: pwsh
+      env:
+        TEST_PATH: ${{ inputs.test-path }}
+        REQUIRE_TESTS: ${{ inputs.require-tests }}
+        RESULTS_PATH: ${{ inputs.results-path }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        & pwsh -NoProfile -NonInteractive -File (Join-Path $env:GITHUB_ACTION_PATH 'pester.ps1')
+        if ($LASTEXITCODE -ne 0) { throw 'Pester tests failed.' }

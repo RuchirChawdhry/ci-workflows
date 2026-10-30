@@ -1,0 +1,23 @@
+name: PowerShell module smoke test
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/powershell-module*.yml'
+      - '.github/workflows/powershell-ci.yml'
+      - 'actions/powershell-*/**'
+      - 'tests/fixtures/SampleModule/**'
+      - 'tests/fixtures/SampleModule.Tests/**'
+      - 'tests/test_powershell_module_contract.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sample-module:
+    uses: ./.github/workflows/powershell-module.yml
+    with:
+      manifest-path: tests/fixtures/SampleModule/SampleModule.psd1
+      test-path: tests/fixtures/SampleModule.Tests
+      runs-on: windows-2025
