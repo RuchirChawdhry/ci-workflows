@@ -50,3 +50,13 @@ runs:
         $ErrorActionPreference = 'Stop'
         & pwsh -NoProfile -NonInteractive -File (Join-Path $env:GITHUB_ACTION_PATH 'check.ps1')
         if ($LASTEXITCODE -ne 0) { throw 'PowerShell quality checks failed.' }
+    - name: Run Pester 6 in clean PowerShell interpreter
+      shell: pwsh
+      env:
+        TEST_PATH: ${{ inputs.test-path }}
+        REQUIRE_TESTS: ${{ inputs.require-tests }}
+        RESULTS_PATH: ${{ inputs.results-path }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        & pwsh -NoProfile -NonInteractive -File (Join-Path $env:GITHUB_ACTION_PATH 'pester.ps1')
+        if ($LASTEXITCODE -ne 0) { throw 'Pester tests failed.' }
