@@ -10,6 +10,8 @@
 
 A growing collection of reusable GitHub Actions workflows and composite actions for CI/CD automation.
 
+**[🌐 Website](https://ruchirchawdhry.github.io/ci-workflows/) · [📚 Documentation](https://ruchirchawdhry.github.io/ci-workflows/docs/)**
+
 I built this repository to keep my projects consistent without maintaining the same pipelines everywhere. It's designed to be lightweight, modular, and easy for anyone to reuse.
 
 Python workflows intentionally use **uv** throughout. This is an opinionated toolkit, not a package-manager abstraction.

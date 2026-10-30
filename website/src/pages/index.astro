@@ -24,7 +24,7 @@ const flowCount = String(workflows.length).padStart(2, '0');
           <a href="#how-it-works">How it works</a>
           <a href="#principles">Philosophy</a>
         </nav>
-        <a class="header-github" href={repository} target="_blank" rel="noopener noreferrer">
+        <a class="mobile-docs" href={import.meta.env.BASE_URL.replace(/\/?$/, "/") + "docs/"}>Docs ↗</a>\n        <a class="header-github" href={repository} target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .9a11.1 11.1 0 0 0-3.51 21.64c.56.1.76-.24.76-.54v-2.11c-3.09.68-3.74-1.31-3.74-1.31-.5-1.28-1.24-1.63-1.24-1.01-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 . 1.71 2.62 1.22 3.26.94.1-.72.4-1.22.72-1.5-2.47-.28-5.07-1.23-5.07-5.49 0-1.21.43-2.2 1.15-2.98-.12-.28-.5-1.42.11-2.95 0 0 .94-.3 3.05 1.14A10.5 10.5 0 0 1 12 6.08c.95 0 1.9.13 2.79.38 2.11-1.44 3.05-1.14 3.05-1.14.61 1.53.23 2.67.11 2.95.71.78 1.14 1.77 1.14 2.98 0 4.27-2.61 5.2-5.09 5.48.42.37.8 1.08.8 2.18V22c0 .3.2.65.77.54A11.1 11.1 0 0 0 12 .9Z"/></svg>
           <span>GitHub</span><span class="northeast" aria-hidden="true">↗</span>
         </a>
