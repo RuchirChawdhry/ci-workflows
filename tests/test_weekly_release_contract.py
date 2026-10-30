@@ -141,3 +141,17 @@ def test_previous_release_must_be_ancestor(tmp_path):
     assert not mod.has_changes(tmp_path, "weekly-2026-10-25", "HEAD")
     with pytest.raises(ValueError, match="ancestor"):
         mod.has_changes(tmp_path, "HEAD", "weekly-2026-10-25")
+
+def test_smoke_workflow_only_builds_not_publishes():
+    wf = yaml.load(
+        (ROOT / ".github/workflows/weekly-release-smoke.yml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    assert "pull_request" in wf["on"]
+    assert wf["permissions"] == {"contents": "read"}
+    steps = wf["jobs"]["archive"]["steps"]
+    script = "\n".join(step.get("run", "") for step in steps)
+    assert "scripts/weekly_release.py" in script
+    assert "sha256sum --check SHA256SUMS.txt" in script
+    assert "gh release create" not in script
+    assert any("actions/upload-artifact@" in step.get("uses", "") for step in steps)
