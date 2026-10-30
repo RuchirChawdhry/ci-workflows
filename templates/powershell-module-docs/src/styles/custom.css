@@ -1,0 +1,16 @@
+:root {
+  --sl-color-accent: #087d68;
+  --sl-color-accent-low: #dbfff4;
+  --sl-color-accent-high: #103a32;
+}
+:root[data-theme='dark'] {
+  --sl-color-bg: #090b17;
+  --sl-color-bg-nav: #101525;
+  --sl-color-bg-sidebar: #101525;
+  --sl-color-accent: #70ecd0;
+  --sl-color-accent-low: #103d36;
+  --sl-color-accent-high: #dafff4;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

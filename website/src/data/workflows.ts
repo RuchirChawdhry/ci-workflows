@@ -62,6 +62,15 @@ export const workflows = [
     path: "pages-astro.yml",
     label: "Deployment",
   },
+  {
+    eyebrow: "08 / Documentation",
+    title: "PowerShell Module Docs",
+    icon: "📚",
+    className: "module-docs",
+    description: "Generate a standalone Starlight reference site from PowerShell command help.",
+    path: "powershell-module-pages.yml",
+    label: "Documentation",
+  },
 ] as const;
 
 export const repository = "https://github.com/RuchirChawdhry/ci-workflows";
