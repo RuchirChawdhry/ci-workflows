@@ -65,7 +65,7 @@ def test_template_is_docs_only_starlight_and_reuses_lockfile():
     config = (TEMPLATE / "astro.config.mjs").read_text()
     assert "starlight(" in config and "DOCS_BASE" in config
     assert "autogenerate: { directory: 'reference' }" in config
-    assert "base:" in config
+    assert "\n  base,\n" in config
     assert (TEMPLATE / "src/content.config.ts").exists()
     assert (TEMPLATE / "src/styles/custom.css").exists()
     assert "astro" in json.loads((ROOT / "website/package.json").read_text())["devDependencies"]
