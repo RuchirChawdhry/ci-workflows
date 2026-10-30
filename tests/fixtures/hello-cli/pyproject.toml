@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ci-workflows-hello-cli"
+version = "0.1.0"
+description = "A tiny fixture to validate reusable Python packaging workflows"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = []
+
+[project.scripts]
+workflow-hello = "hello_cli.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hello_cli"]

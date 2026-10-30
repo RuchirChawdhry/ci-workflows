@@ -1,0 +1,1 @@
+"""Minimal distributable fixture."""
