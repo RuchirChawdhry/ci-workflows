@@ -1,0 +1,40 @@
+name: Test an installed Python CLI
+
+description: Install exactly one built wheel into a clean uv environment and run its console script.
+inputs:
+  cli-command:
+    description: Console script executable name (not an arbitrary shell command)
+    required: true
+  python-version:
+    description: Python version for the isolated environment
+    required: false
+    default: '3.14.7'
+  dist-dir:
+    description: Directory containing exactly one wheel
+    required: false
+    default: dist
+runs:
+  using: composite
+  steps:
+    - name: Install wheel and exercise installed CLI
+      shell: bash
+      env:
+        CLI_COMMAND: ${{ inputs.cli-command }}
+        PYTHON_VERSION: ${{ inputs.python-version }}
+        DIST_DIR: ${{ inputs.dist-dir }}
+      run: |
+        set -euo pipefail
+        if [[ ! "$CLI_COMMAND" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+          echo 'cli-command must be a single executable name' >&2
+          exit 1
+        fi
+        shopt -s nullglob
+        wheels=("$DIST_DIR"/*.whl)
+        if (( ${#wheels[@]} != 1 )); then
+          echo "Expected exactly one wheel in $DIST_DIR" >&2
+          exit 1
+        fi
+        venv="$RUNNER_TEMP/python-cli-smoke"
+        uv venv --python "$PYTHON_VERSION" "$venv"
+        uv pip install --python "$venv/bin/python" "${wheels[0]}"
+        "$venv/bin/$CLI_COMMAND" --help
