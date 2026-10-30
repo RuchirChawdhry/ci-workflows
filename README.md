@@ -1,6 +1,12 @@
 # ci-workflows
 
-**Less YAML. More building.** ⚡
+<p align="center">
+  <img src="assets\ci-cd-automation-workflow.png" alt="ci/cd workflows github actions logo" width="180">
+</p>
+
+<p align="center">
+  <strong>Less YAML. More building.⚡</strong>
+</p>
 
 A growing collection of reusable GitHub Actions workflows and composite actions for CI/CD automation.
 
