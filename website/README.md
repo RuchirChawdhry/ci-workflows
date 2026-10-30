@@ -28,7 +28,10 @@ The central workflow also enforces the branch restriction, keeps its build job r
 
 ## Structure
 
-- `src/pages/index.astro`: marketing and navigation content\n- `src/content/docs/docs/`: searchable Starlight documentation under `/ci-workflows/docs/`\n- `src/content.config.ts`: Starlight content collection\n- `src/styles/starlight.css`: docs-only design overrides
+- `src/pages/index.astro`: marketing and navigation content
+- `src/content/docs/docs/`: searchable Starlight documentation under `/ci-workflows/docs/`
+- `src/content.config.ts`: Starlight content collection
+- `src/styles/starlight.css`: docs-only design overrides
 - `src/data/workflows.ts`: grounded workflow cards and source links
 - `src/layouts/BaseLayout.astro`: metadata and accessible document shell
 - `src/styles/global.css`: responsive visual design
