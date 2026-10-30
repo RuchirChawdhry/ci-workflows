@@ -32,5 +32,5 @@ runs:
         $ErrorActionPreference = 'Stop'
         uv run --no-project --python 3.14.7 python (Join-Path $env:GITHUB_ACTION_PATH 'smoke.py') `
           --asset $env:ASSET_PATH --manifest $env:MANIFEST_PATH `
-          --app-name $env:APP_NAME --help-argument $env:HELP_ARGUMENT
+          --app-name $env:APP_NAME --help-argument=$env:HELP_ARGUMENT
         if ($LASTEXITCODE -ne 0) { throw 'Scoop installation smoke test failed.' }
