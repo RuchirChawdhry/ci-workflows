@@ -22,6 +22,7 @@ jobs:
       import-name: markbox
       cli-command: markbox
       test-requirements: pytest
+      explore-unsupported: true  # Optional, clearly flagged experimental mode
 ```
 
 After review, use an immutable SHA or the intended stable release tag instead of the feature branch.
@@ -45,9 +46,9 @@ Missing matrix results appear as INFRA, never as an unsupported Python version.
 - Defaults to CPython 3.6–3.15 on Linux, in groups of up to four parallel jobs.
 - Pass exact patch versions such as 3.12.4 for finer investigation.
 - Passing under Linux is not evidence of Windows or macOS compatibility.
-- A source compile can succeed even when requires-python disallows installation; metadata is respected.
+- By default, requires-python is respected. With explore-unsupported: true, the workflow\n  relaxes only that field in a disposable copy and labels any passing result EXPERIMENTAL_PASS.\n  The original repository and package metadata remain untouched.
 - Complex dependency resolution failures retain uv diagnostics, but automatic identification of the root offending dependency is best-effort.
-- This first version does not bypass declared requires-python constraints or test PyPy.
+- This first version does not test PyPy or other operating systems.
 - No tests directory is explicitly marked as skipped. A PASS is not an official support promise.
 
 The central repo's PR integration test uses tests/fixtures/hello-cli on Python 3.12 and 3.14.
