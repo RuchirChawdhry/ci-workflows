@@ -10,7 +10,7 @@ on:
       runs-on:
         description: GitHub-hosted runner label
         type: string
-        default: ubuntu-24.04
+        default: ubuntu-slim
       cli-command:
         description: Optional installed CLI command to smoke-test with --help
         type: string
@@ -22,7 +22,7 @@ permissions:
 jobs:
   quality:
     runs-on: ${{ inputs.runs-on }}
-    timeout-minutes: 20
+    timeout-minutes: 14
     steps:
       - name: Checkout project
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
