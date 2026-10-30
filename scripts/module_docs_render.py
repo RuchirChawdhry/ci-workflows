@@ -56,6 +56,20 @@ def has_authored_help(markdown: str) -> bool:
                ("synopsis", "description", "examples"))
 
 
+def authored_parameters_complete(markdown: str, command: dict) -> bool:
+    """Ensure authored help actually describes every exported public parameter."""
+    for parameter in command.get("parameters", []):
+        name = str(parameter.get("name", ""))
+        match = re.search(r"(?im)^###\s+-?" + re.escape(name) + r"\s*$", markdown)
+        if not match:
+            return False
+        body = re.split(r"(?m)^#{2,3}\s+", markdown[match.end():], maxsplit=1)[0]
+        first = next((line.strip() for line in body.splitlines() if line.strip()), "")
+        if not present(first) or first.lower().startswith(("type:", "default:", "required:", "parameter properties")):
+            return False
+    return True
+
+
 def compose_reference(command: dict, strict: bool, override: str | None) -> str:
     name = command["name"]
     missing = []
@@ -68,7 +82,9 @@ def compose_reference(command: dict, strict: bool, override: str | None) -> str:
         if not present(param.get("description")):
             missing.append(f"parameter:{param.get('name', '')}")
 
-    if strict and missing and not (override and has_authored_help(override)):
+    if strict and missing and not (
+        override and has_authored_help(override) and authored_parameters_complete(override, command)
+    ):
         raise ValueError(f"{name}: incomplete authored help: {', '.join(missing)}")
     synopsis = command.get("synopsis") or name
     content = [frontmatter(name, synopsis)]
