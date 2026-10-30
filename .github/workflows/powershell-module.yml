@@ -1,0 +1,77 @@
+name: PowerShell module build
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        description: Path to the source .psd1 module manifest
+        type: string
+        required: true
+      test-path:
+        description: Pester tests folder
+        type: string
+        default: tests
+      runs-on:
+        description: Runner label (default Windows Server 2025)
+        type: string
+        default: windows-2025
+      minimum-powershell-version:
+        description: Required PowerShell 7 version
+        type: string
+        default: '7.6.9'
+      artifact-name:
+        description: Name of uploaded module ZIP artifact
+        type: string
+        default: powershell-module
+    outputs:
+      module-name:
+        value: ${{ jobs.build.outputs.module-name }}
+      module-version:
+        value: ${{ jobs.build.outputs.module-version }}
+      artifact-id:
+        value: ${{ jobs.build.outputs.artifact-id }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 25
+    outputs:
+      module-name: ${{ steps.package.outputs.module-name }}
+      module-version: ${{ steps.package.outputs.module-version }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Checkout calling repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate PowerShell scripts and Pester tests
+        uses: $/actions/powershell-checks
+        with:
+          minimum-powershell-version: ${{ inputs.minimum-powershell-version }}
+          test-path: ${{ inputs.test-path }}
+          require-tests: 'true'
+      - name: Stage and independently verify module archive
+        id: package
+        uses: $/actions/powershell-module-build
+        with:
+          manifest-path: ${{ inputs.manifest-path }}
+      - name: Upload Pester JUnit report (even on failure)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: powershell-pester-results
+          path: reports/pester.xml
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload verified module ZIP
+        if: ${{ steps.package.outcome == 'success' }}
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ steps.package.outputs.module-zip }}
+          if-no-files-found: error
+          retention-days: 7
