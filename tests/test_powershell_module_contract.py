@@ -29,8 +29,9 @@ def test_checks_are_reused_by_old_script_ci():
     assert action["inputs"]["require-tests"]["default"] == "false"
     script = ROOT / "actions/powershell-checks/check.ps1"
     source = script.read_text()
-    assert "TestResult.OutputFormat" in source
-    assert "JUnitXml" in source
+    pester = (ROOT / "actions/powershell-checks/pester.ps1").read_text()
+    assert "TestResult.OutputFormat" in pester
+    assert "JUnitXml" in pester
     assert "PSScriptAnalyzer" in source
     assert "Pester" in (ROOT / "actions/powershell-checks/pester.ps1").read_text()
     assert "RequireTests" in source
