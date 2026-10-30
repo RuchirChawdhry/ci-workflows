@@ -1,0 +1,127 @@
+name: Python Compatibility Explorer
+
+on:
+  workflow_call:
+    inputs:
+      versions-json:
+        description: JSON array of CPython minor or exact patch versions
+        type: string
+        default: '["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.15"]'
+      package-path:
+        description: Python package path relative to the consuming repository root
+        type: string
+        default: '.'
+      import-name:
+        description: Optional import name to smoke-test
+        type: string
+        default: ''
+      cli-command:
+        description: Optional installed CLI executable to test with --help
+        type: string
+        default: ''
+      test-requirements:
+        description: Space-separated test dependencies installed into the probe environment
+        type: string
+        default: 'pytest'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: CPython ${{ matrix.python }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        python: ${{ fromJSON(inputs.versions-json) }}
+    steps:
+      - name: Checkout consumer project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout exact shared-workflow implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-workflows
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
+      - name: Run isolated probe
+        env:
+          PYTHON_VERSION: ${{ matrix.python }}
+          PACKAGE_PATH: ${{ inputs.package-path }}
+          IMPORT_NAME: ${{ inputs.import-name }}
+          CLI_COMMAND: ${{ inputs.cli-command }}
+          TEST_REQUIREMENTS: ${{ inputs.test-requirements }}
+        run: |
+          uv run --no-project --python 3.14.7 --with packaging \
+            python .ci-workflows/scripts/compat_probe.py \
+            --project "$GITHUB_WORKSPACE/$PACKAGE_PATH" \
+            --version "$PYTHON_VERSION" \
+            --import-name "$IMPORT_NAME" \
+            --cli-command "$CLI_COMMAND" \
+            --test-requirements "$TEST_REQUIREMENTS" \
+            --output "compat-results/$PYTHON_VERSION.json"
+      - name: Preserve per-version evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: compat-${{ matrix.python }}
+          path: compat-results/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  report:
+    name: Consolidate compatibility evidence
+    needs: [probe]
+    if: always()
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact shared-workflow implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
+      - name: Download available probe results
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        continue-on-error: true
+        with:
+          pattern: compat-*
+          path: compat-results
+          merge-multiple: true
+      - name: Build JSON and Markdown report
+        env:
+          VERSIONS_JSON: ${{ inputs.versions-json }}
+        run: |
+          uv run --no-project --python 3.14.7 --with packaging \
+            python scripts/compat_report.py \
+            --input compat-results \
+            --versions-json "$VERSIONS_JSON" \
+            --json-output compatibility.json \
+            --markdown-output compatibility.md
+          cat compatibility.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve consolidated report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: python-compatibility-report
+          path: |
+            compatibility.json
+            compatibility.md
+          if-no-files-found: warn
+          retention-days: 30
