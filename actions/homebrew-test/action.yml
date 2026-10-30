@@ -1,0 +1,35 @@
+name: Test Homebrew installation
+description: Validate actual brew install, brew test, and the installed CLI from an isolated local tap.
+inputs:
+  archive-path:
+    description: Tested release archive
+    required: true
+  formula-path:
+    description: Generated personal-tap formula
+    required: true
+  app-name:
+    description: Package name
+    required: true
+  binary-name:
+    description: Installed executable filename (defaults to package name)
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      with:
+        version: latest-known
+        enable-cache: false
+    - name: Test in disposable Homebrew tap
+      shell: bash
+      env:
+        ARCHIVE: ${{ inputs.archive-path }}
+        FORMULA: ${{ inputs.formula-path }}
+        APP_NAME: ${{ inputs.app-name }}
+        BINARY_NAME: ${{ inputs.binary-name }}
+      run: |
+        set -euo pipefail
+        uv run --no-project --python 3.14.7 python "$GITHUB_ACTION_PATH/smoke.py" \
+          --archive "$ARCHIVE" --formula "$FORMULA" \
+          --app-name "$APP_NAME" --binary-name "$BINARY_NAME"
