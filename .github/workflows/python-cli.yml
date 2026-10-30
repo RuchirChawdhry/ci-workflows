@@ -28,28 +28,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.2
+      - name: Python CLI quality checks
+        uses: $/actions/python-checks
         with:
-          version: latest-known
-      - name: Set up Python and dependencies
-        env:
-          UV_PYTHON: ${{ inputs.python-version }}
-        run: |
-          uv python install "$UV_PYTHON"
-          uv sync --python "$UV_PYTHON" --group dev
-      - name: Verify Python version
-        env:
-          UV_PYTHON: ${{ inputs.python-version }}
-        run: uv run --no-sync python --version
-      - name: Lint
-        run: uv run --no-sync ruff check .
-      - name: Check formatting
-        run: uv run --no-sync ruff format --check .
-      - name: Test
-        run: uv run --no-sync pytest -q
-      - name: CLI help smoke test
-        if: ${{ inputs.cli-command != '' }}
-        env:
-          CLI_COMMAND: ${{ inputs.cli-command }}
-        run: uv run --no-sync "$CLI_COMMAND" --help
+          python-version: ${{ inputs.python-version }}
+          cli-command: ${{ inputs.cli-command }}

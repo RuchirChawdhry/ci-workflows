@@ -1,0 +1,46 @@
+name: Python CLI quality checks
+description: Opinionated uv-only Python CLI setup, lint, formatting, tests, and optional help smoke test.
+
+inputs:
+  python-version:
+    description: Python version to test
+    required: false
+    default: '3.14.7'
+  cli-command:
+    description: Optional installed CLI executable name to smoke-test with --help
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      with:
+        version: latest-known
+    - name: Install Python and project dependencies
+      shell: bash
+      env:
+        PYTHON_VERSION: ${{ inputs.python-version }}
+      run: |
+        set -euo pipefail
+        uv python install "$PYTHON_VERSION"
+        uv sync --python "$PYTHON_VERSION" --group dev
+    - name: Verify Python
+      shell: bash
+      run: uv run --no-sync python --version
+    - name: Lint
+      shell: bash
+      run: uv run --no-sync ruff check .
+    - name: Check formatting
+      shell: bash
+      run: uv run --no-sync ruff format --check .
+    - name: Test
+      shell: bash
+      run: uv run --no-sync pytest -q
+    - name: CLI help smoke test
+      if: ${{ inputs.cli-command != '' }}
+      shell: bash
+      env:
+        CLI_COMMAND: ${{ inputs.cli-command }}
+      run: uv run --no-sync "$CLI_COMMAND" --help
