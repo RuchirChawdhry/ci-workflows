@@ -1,0 +1,28 @@
+/* Only loaded for Starlight pages. The branded homepage remains independent. */
+:root {
+  --sl-color-accent-low: #143b35;
+  --sl-color-accent: #087b68;
+  --sl-color-accent-high: #164d41;
+  --sl-font: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+}
+:root[data-theme='dark'] {
+  --sl-color-bg: #090b17;
+  --sl-color-bg-nav: #101525;
+  --sl-color-bg-sidebar: #101525;
+  --sl-color-bg-inline-code: #19233a;
+  --sl-color-accent-low: #134f46;
+  --sl-color-accent: #6cebcf;
+  --sl-color-accent-high: #d2fff4;
+  --sl-color-white: #f5f8ff;
+  --sl-color-gray-6: #121a2d;
+}
+:root[data-theme='light'] {
+  --sl-color-accent: #096e5a;
+}
+.site-title { font-weight: 750; letter-spacing: -.035em; }
+.hero h1 { letter-spacing: -.045em; }
+.sl-markdown-content a { text-underline-offset: .18em; }
+.sl-markdown-content code:not(pre code) { border-radius: .25rem; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

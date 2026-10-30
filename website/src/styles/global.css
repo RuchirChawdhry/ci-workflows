@@ -221,3 +221,15 @@ a.workflow-card:hover .workflow-arrow { color: #6df2d0; transform: translate(2px
 @media (prefers-reduced-motion: reduce) {
  *, *:before, *:after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* Make docs discoverable even when the desktop nav collapses. */
+.mobile-docs { display: none; }
+@media (max-width: 740px) {
+  .mobile-docs {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-left: auto; padding: 9px 13px;
+    border: 1px solid #66c9b3; border-radius: 9px;
+    color: #89f5d8; font-size: 12px; font-weight: 750;
+  }
+  .header-github { display: none; }
+}

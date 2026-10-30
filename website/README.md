@@ -1,6 +1,6 @@
 # ci-workflows website
 
-An Astro-built landing page for the reusable [ci-workflows](https://github.com/RuchirChawdhry/ci-workflows) toolkit.
+An Astro-built landing page **and Starlight documentation** for the reusable [ci-workflows](https://github.com/RuchirChawdhry/ci-workflows) toolkit.
 
 ## Local development
 
@@ -29,9 +29,12 @@ The central workflow also enforces the branch restriction, keeps its build job r
 ## Structure
 
 - `src/pages/index.astro`: marketing and navigation content
+- `src/content/docs/docs/`: searchable Starlight documentation under `/ci-workflows/docs/`
+- `src/content.config.ts`: Starlight content collection
+- `src/styles/starlight.css`: docs-only design overrides
 - `src/data/workflows.ts`: grounded workflow cards and source links
 - `src/layouts/BaseLayout.astro`: metadata and accessible document shell
 - `src/styles/global.css`: responsive visual design
 - `public/favicon.svg`: scalable favicon
 
-No framework other than Astro is involved, and the design does not depend on any backend services.
+Starlight extends Astro for documentation; the design does not depend on backend services.
