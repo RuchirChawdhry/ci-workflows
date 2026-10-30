@@ -23,6 +23,10 @@ on:
         description: Space-separated test dependencies installed into the probe environment
         type: string
         default: 'pytest'
+      explore-unsupported:
+        description: Test older interpreters against a disposable copy with relaxed requires-python metadata
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,7 +65,12 @@ jobs:
           IMPORT_NAME: ${{ inputs.import-name }}
           CLI_COMMAND: ${{ inputs.cli-command }}
           TEST_REQUIREMENTS: ${{ inputs.test-requirements }}
+          EXPLORE_UNSUPPORTED: ${{ inputs.explore-unsupported }}
         run: |
+          EXTRA_ARGS=()
+          if [ "$EXPLORE_UNSUPPORTED" = "true" ]; then
+            EXTRA_ARGS+=(--explore-unsupported)
+          fi
           uv run --no-project --python 3.14.7 --with packaging \
             python .ci-workflows/scripts/compat_probe.py \
             --project "$GITHUB_WORKSPACE/$PACKAGE_PATH" \
@@ -69,6 +78,7 @@ jobs:
             --import-name "$IMPORT_NAME" \
             --cli-command "$CLI_COMMAND" \
             --test-requirements "$TEST_REQUIREMENTS" \
+            "${EXTRA_ARGS[@]}" \
             --output "compat-results/$PYTHON_VERSION.json"
       - name: Preserve per-version evidence
         if: always()
