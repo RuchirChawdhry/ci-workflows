@@ -1,0 +1,22 @@
+name: Astro Pages contract integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pages-astro*.yml'
+      - 'tests/test_pages_astro_contract.py'
+      - 'tests/fixtures/astro-site/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  astro-smoke:
+    uses: ./.github/workflows/pages-astro.yml
+    with:
+      site-path: tests/fixtures/astro-site
+      package-manager: npm
+      publish: false
