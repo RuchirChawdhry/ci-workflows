@@ -28,4 +28,5 @@ runs:
         OUTPUT_DIR: ${{ inputs.output-dir }}
       run: |
         $ErrorActionPreference = 'Stop'
-        & (Join-Path $env:GITHUB_ACTION_PATH 'build.ps1') -ManifestPath $env:MANIFEST_PATH -OutputDir $env:OUTPUT_DIR
+        & pwsh -NoProfile -NonInteractive -File (Join-Path $env:GITHUB_ACTION_PATH 'build.ps1') -ManifestPath $env:MANIFEST_PATH -OutputDir $env:OUTPUT_DIR
+        if ($LASTEXITCODE -ne 0) { throw 'Module packaging failed.' }
