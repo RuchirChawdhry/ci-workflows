@@ -17,8 +17,8 @@ export default defineConfig({
       customCss: ['./src/styles/custom.css'],
       sidebar: [
         { label: 'Overview', link: base.endsWith('/') ? base : base + '/' },
-        { label: 'Command reference', autogenerate: { directory: 'reference' } },
-        ...(hasGuides ? [{ label: 'Guides', autogenerate: { directory: 'guides' } }] : []),
+        { label: 'Command reference', items: [{ autogenerate: { directory: 'reference' } }] },
+        ...(hasGuides ? [{ label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] }] : []),
       ],
     }),
   ],
