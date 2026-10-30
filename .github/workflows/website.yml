@@ -1,0 +1,33 @@
+name: Website
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - '.github/workflows/website.yml'
+      - '.github/workflows/pages-astro.yml'
+      - 'tests/test_website_contract.py'
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/website.yml'
+      - '.github/workflows/pages-astro.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-website-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  website:
+    uses: ./.github/workflows/pages-astro.yml
+    with:
+      site-path: website
+      package-manager: npm
+      publish: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}

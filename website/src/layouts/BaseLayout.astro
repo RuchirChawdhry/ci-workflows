@@ -1,0 +1,40 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'ci-workflows | Less YAML. More building.',
+  description = 'Reusable GitHub Actions workflows and composable CI/CD building blocks for Python, PowerShell, Scoop, Homebrew, and Astro.',
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const socialImage = 'https://raw.githubusercontent.com/RuchirChawdhry/ci-workflows/main/assets/ci-cd-automation-workflow.png';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b16" />
+    <meta name="description" content={description} />
+    <meta name="author" content="Ruchir Chawdhry" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.toString()} />
+    <meta property="og:image" content={socialImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href={canonical.toString()} />
+    <link rel="icon" type="image/svg+xml" href={base + '/favicon.svg'} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <slot />
+  </body>
+</html>
