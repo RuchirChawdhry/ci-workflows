@@ -1,0 +1,91 @@
+name: PowerShell CI
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label (Windows 2025 includes PowerShell 7)
+        type: string
+        default: windows-2025
+      minimum-powershell-version:
+        description: Minimum required modern PowerShell version
+        type: string
+        default: '7.6.9'
+      test-path:
+        description: Directory containing optional Pester *.Tests.ps1 files
+        type: string
+        default: tests
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify modern PowerShell
+        env:
+          MIN_PS_VERSION: ${{ inputs.minimum-powershell-version }}
+        run: |
+          $current = $PSVersionTable.PSVersion
+          Write-Host "PowerShell $current"
+          if ($current -lt [version]$env:MIN_PS_VERSION) {
+            throw "PowerShell $env:MIN_PS_VERSION or newer is required. Found $current."
+          }
+      - name: Install analysis tools
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository
+          Import-Module PSScriptAnalyzer
+      - name: Parse PowerShell files
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(Get-ChildItem -Path . -Recurse -File -Include *.ps1,*.psm1,*.psd1)
+          foreach ($file in $files) {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName, [ref]$tokens, [ref]$parseErrors
+            )
+            foreach ($issue in $parseErrors) {
+              Write-Host "::error file=$($file.FullName),line=$($issue.Extent.StartLineNumber)::$($issue.Message)"
+            }
+            if ($parseErrors.Count -gt 0) { throw "Syntax errors in $($file.FullName)" }
+          }
+      - name: Run PSScriptAnalyzer
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(Get-ChildItem -Path . -Recurse -File -Include *.ps1,*.psm1,*.psd1)
+          $issues = @($files | ForEach-Object {
+            Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error,Warning
+          })
+          foreach ($issue in $issues) {
+            Write-Host "::error file=$($issue.ScriptName),line=$($issue.Line)::$($issue.Message)"
+          }
+          if ($issues.Count -gt 0) { throw "$($issues.Count) PSScriptAnalyzer issue(s)." }
+      - name: Run Pester tests (if present)
+        env:
+          TEST_PATH: ${{ inputs.test-path }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path -LiteralPath $env:TEST_PATH -PathType Container)) {
+            Write-Host 'No Pester test directory. Skipping.'
+            return
+          }
+          $testFiles = @(Get-ChildItem -LiteralPath $env:TEST_PATH -Recurse -File -Filter '*.Tests.ps1')
+          if ($testFiles.Count -eq 0) {
+            Write-Host 'No Pester tests. Skipping.'
+            return
+          }
+          Install-PSResource -Name Pester -Version '6.2.0' -Scope CurrentUser -TrustRepository
+          Import-Module Pester -RequiredVersion '6.2.0'
+          $result = Invoke-Pester -Path $env:TEST_PATH -PassThru -Output Detailed
+          if ($result.Result -ne 'Passed') { throw "Pester result: $($result.Result)" }
