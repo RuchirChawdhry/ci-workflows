@@ -22,9 +22,11 @@ def summarize(directory, versions):
                      "reason": f"Missing/invalid result: {exc}", "checks": []}
         results.append(value)
     passed = [r["version"] for r in results if r["status"] == "PASS"]
+    experimental = [r["version"] for r in results if r["status"] == "EXPERIMENTAL_PASS"]
     return {"results": results,
             "counts": dict(sorted(Counter(r["status"] for r in results).items())),
-            "lowest_passing": min(passed, key=Version) if passed else None}
+            "lowest_passing": min(passed, key=Version) if passed else None,
+            "lowest_experimental": min(experimental, key=Version) if experimental else None}
 
 
 def markdown(report):
@@ -36,6 +38,9 @@ def markdown(report):
         lines.append(f"| {entry['version']} | {entry['status']} | {entry.get('failed_stage') or '—'} | {reason} |")
     lines.extend(["",
                   f"**Lowest tested passing version:** {report['lowest_passing'] or 'None'}",
+                  f"**Lowest exploratory passing version:** {report.get('lowest_experimental') or 'None'}",
+                  "", "EXPERIMENTAL_PASS indicates the package was tested with requires-python relaxed "
+                  "only in a disposable copy; it does not certify the original distribution.",
                   "", "Passing is not an official support guarantee. Only the tested interpreter, "
                   "dependencies, operating system, and checks are covered. "
                   "Missing results are INFRA, not incompatibility."])
