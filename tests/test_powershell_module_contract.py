@@ -34,7 +34,7 @@ def test_checks_are_reused_by_old_script_ci():
     assert "JUnitXml" in pester
     assert "PSScriptAnalyzer" in source
     assert "Pester" in (ROOT / "actions/powershell-checks/pester.ps1").read_text()
-    assert "RequireTests" in source
+    assert "$env:REQUIRE_TESTS" in pester
     assert "7.6.9" in source
 
 def test_module_build_does_isolated_import_and_checks_exports():
