@@ -1,0 +1,69 @@
+export const workflows = [
+  {
+    eyebrow: "01 / Quality",
+    title: "Python CLI",
+    icon: "🐍",
+    className: "python",
+    description: "Opinionated uv-powered linting, formatting, tests, and CLI smoke checks.",
+    path: "python-cli.yml",
+    label: "Testing",
+  },
+  {
+    eyebrow: "02 / Distribution",
+    title: "Python Build",
+    icon: "📦",
+    className: "build",
+    description: "Build and verify installable Python artifacts with a repeatable pipeline.",
+    path: "python-build.yml",
+    label: "Packaging",
+  },
+  {
+    eyebrow: "03 / Exploration",
+    title: "Compatibility Explorer",
+    icon: "🧪",
+    className: "compat",
+    description: "Discover which Python versions work, and why particular versions fail.",
+    path: "python-compat.yml",
+    label: "Diagnostics",
+  },
+  {
+    eyebrow: "04 / Quality",
+    title: "PowerShell CI",
+    icon: "⚡",
+    className: "powershell",
+    description: "Reusable quality checks for PowerShell automation and scripts.",
+    path: "powershell-ci.yml",
+    label: "Testing",
+  },
+  {
+    eyebrow: "05 / Windows",
+    title: "Scoop",
+    icon: "🪟",
+    className: "scoop",
+    description: "Generate and test Scoop manifests for portable Windows command-line tools.",
+    path: "scoop-ci.yml",
+    label: "Packaging",
+  },
+  {
+    eyebrow: "06 / macOS",
+    title: "Homebrew",
+    icon: "🍺",
+    className: "homebrew",
+    description: "Produce and validate Homebrew formulae for macOS CLI releases.",
+    path: "homebrew-ci.yml",
+    label: "Packaging",
+  },
+  {
+    eyebrow: "07 / Websites",
+    title: "Astro Pages",
+    icon: "🌐",
+    className: "astro",
+    description: "Build Astro sites and deploy to GitHub Pages with explicit publication guards.",
+    path: "pages-astro.yml",
+    label: "Deployment",
+  },
+] as const;
+
+export const repository = "https://github.com/RuchirChawdhry/ci-workflows";
+export const workflowUrl = (path: string) =>
+  repository + "/blob/main/.github/workflows/" + path;
