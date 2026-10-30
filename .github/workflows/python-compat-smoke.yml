@@ -1,0 +1,21 @@
+name: Compatibility Explorer integration smoke test
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/python-compat*.yml'
+      - 'scripts/compat_*.py'
+      - 'tests/test_compat*.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    uses: $/.github/workflows/python-compat.yml
+    with:
+      package-path: tests/fixtures/hello-cli
+      versions-json: '["3.12","3.14"]'
+      import-name: hello_cli
+      cli-command: workflow-hello
