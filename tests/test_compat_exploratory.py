@@ -32,7 +32,7 @@ def test_markdown_surfaces_final_traceback_exception(tmp_path):
     import json
     (tmp_path / "3.10.json").write_text(json.dumps({
         "version": "3.10", "status": "CLI", "failed_stage": "cli",
-        "reason": "Traceback (most recent call last):\\n  File x\\nImportError: cannot import name UTC"
+        "reason": "Traceback (most recent call last):\n  File x\nImportError: cannot import name UTC"
     }))
     result = markdown(summarize(tmp_path, ["3.10"]))
     assert "ImportError: cannot import name UTC" in result
