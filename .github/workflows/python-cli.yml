@@ -1,0 +1,55 @@
+name: Python CLI CI
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version to test
+        type: string
+        default: '3.14.7'
+      runs-on:
+        description: GitHub-hosted runner label
+        type: string
+        default: ubuntu-24.04
+      cli-command:
+        description: Optional installed CLI command to smoke-test with --help
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: latest-known
+      - name: Set up Python and dependencies
+        env:
+          UV_PYTHON: ${{ inputs.python-version }}
+        run: |
+          uv python install "$UV_PYTHON"
+          uv sync --python "$UV_PYTHON" --group dev
+      - name: Verify Python version
+        env:
+          UV_PYTHON: ${{ inputs.python-version }}
+        run: uv run --no-sync python --version
+      - name: Lint
+        run: uv run --no-sync ruff check .
+      - name: Check formatting
+        run: uv run --no-sync ruff format --check .
+      - name: Test
+        run: uv run --no-sync pytest -q
+      - name: CLI help smoke test
+        if: ${{ inputs.cli-command != '' }}
+        env:
+          CLI_COMMAND: ${{ inputs.cli-command }}
+        run: uv run --no-sync "$CLI_COMMAND" --help
