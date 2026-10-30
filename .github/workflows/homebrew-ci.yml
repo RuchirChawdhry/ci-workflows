@@ -1,0 +1,94 @@
+name: Homebrew CI
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: Existing same-run release archive artifact
+        type: string
+        required: true
+      archive-path:
+        description: Relative path to a tested tar.gz in the artifact
+        type: string
+        required: true
+      app-name:
+        description: Lowercase Homebrew formula name
+        type: string
+        required: true
+      version:
+        description: Release version without v prefix
+        type: string
+        required: true
+      release-url:
+        description: Final public URL serving the exact release bytes
+        type: string
+        required: true
+      homepage:
+        description: Public HTTPS project homepage
+        type: string
+        required: true
+      description:
+        type: string
+        default: A portable command-line tool
+      license:
+        type: string
+        default: ''
+      binary-name:
+        type: string
+        default: ''
+      runs-on:
+        description: Runner matching the macOS executable architecture
+        type: string
+        default: macos-15-intel
+      architecture:
+        description: x86_64 or arm64; must match the archive and runner
+        type: string
+        default: x86_64
+    outputs:
+      formula-artifact-id:
+        description: ID of uploaded formula
+        value: ${{ jobs.validate.outputs.formula-artifact-id }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 25
+    outputs:
+      formula-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Download tested macOS archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: release-assets
+      - name: Generate Homebrew formula
+        id: formula
+        uses: $/actions/homebrew-formula
+        with:
+          archive-path: release-assets/${{ inputs.archive-path }}
+          app-name: ${{ inputs.app-name }}
+          version: ${{ inputs.version }}
+          release-url: ${{ inputs.release-url }}
+          homepage: ${{ inputs.homepage }}
+          description: ${{ inputs.description }}
+          license: ${{ inputs.license }}
+          binary-name: ${{ inputs.binary-name }}
+          architecture: ${{ inputs.architecture }}
+      - name: Install and test through disposable Homebrew tap
+        uses: $/actions/homebrew-test
+        with:
+          archive-path: release-assets/${{ inputs.archive-path }}
+          formula-path: ${{ steps.formula.outputs.formula-path }}
+          app-name: ${{ inputs.app-name }}
+          binary-name: ${{ inputs.binary-name }}
+      - name: Upload validated personal tap formula
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: homebrew-formula-${{ inputs.app-name }}
+          path: ${{ steps.formula.outputs.formula-path }}
+          retention-days: 7
+          if-no-files-found: error
