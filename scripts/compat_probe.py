@@ -6,6 +6,7 @@ Each result records stage evidence without treating every red job as code incomp
 import argparse
 import json
 import re
+import shutil
 import shlex
 import subprocess
 import sys
@@ -37,12 +38,30 @@ def python_requirement(project):
     return data.get("project", {}).get("requires-python", "")
 
 
+def exploratory_copy(project, destination):
+    """Relax only project.requires-python in a disposable copy of the package."""
+    shutil.copytree(project, destination, ignore=shutil.ignore_patterns(
+        ".git", ".venv", ".ci-workflows", "__pycache__", "dist", "build"))
+    pyproject = destination / "pyproject.toml"
+    lines = pyproject.read_text(encoding="utf-8").splitlines(keepends=True)
+    in_project = False
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith("["):
+            in_project = line.strip() == "[project]"
+        elif in_project and re.match(r"^\s*requires-python\s*=", line):
+            lines[index] = 'requires-python = ">=3.6"\n'
+            pyproject.write_text("".join(lines), encoding="utf-8")
+            return destination
+    raise ValueError("Cannot locate project.requires-python in copy")
+
+
 def probe(project, version, execute=execute_command, *, import_name="",
-          cli_command="", test_requirements="pytest"):
+          cli_command="", test_requirements="pytest", explore_unsupported=False):
     """Return a complete, machine-readable diagnosis for one requested version."""
     project = Path(project).resolve()
     result = {"version": version, "actual_version": "", "status": "PASS",
-              "failed_stage": None, "reason": "Checks passed", "checks": []}
+              "failed_stage": None, "reason": "Checks passed", "checks": [],
+              "exploratory": False}
 
     def check(stage, argv, cwd=project):
         completed = execute(stage, list(map(str, argv)), cwd)
@@ -74,23 +93,30 @@ def probe(project, version, execute=execute_command, *, import_name="",
 
         try:
             requirement = python_requirement(project)
+            install_project = project
             if requirement and Version(version) not in SpecifierSet(requirement):
-                result.update(status="UNSUPPORTED", failed_stage="metadata",
-                              reason=f"requires-python {requirement} excludes Python {version}")
-                result["checks"].append({"stage": "metadata", "ok": False,
-                                         "detail": result["reason"]})
-                return result
-            result["checks"].append({"stage": "metadata", "ok": True,
-                                     "detail": requirement or "No requires-python declaration"})
+                message = f"requires-python {requirement} excludes Python {version}"
+                if not explore_unsupported:
+                    result.update(status="UNSUPPORTED", failed_stage="metadata", reason=message)
+                    result["checks"].append({"stage": "metadata", "ok": False,
+                                             "detail": message})
+                    return result
+                install_project = exploratory_copy(project, Path(temporary) / "project")
+                result["exploratory"] = True
+                result["checks"].append({"stage": "metadata", "ok": True,
+                                         "detail": f"EXPLORATORY: relaxed {message} in disposable copy"})
+            else:
+                result["checks"].append({"stage": "metadata", "ok": True,
+                                         "detail": requirement or "No requires-python declaration"})
         except (OSError, ValueError, KeyError) as exc:
             result.update(status="METADATA", failed_stage="metadata", reason=str(exc))
             return result
 
         if not check("install-no-deps", ["uv", "pip", "install", "--python", python,
-                                          "--no-deps", project]):
+                                          "--no-deps", install_project]):
             return result
         if not check("install-with-deps", ["uv", "pip", "install", "--python", python,
-                                            project]):
+                                            install_project]):
             return result
         requirements = shlex.split(test_requirements)
         if requirements and not check("test-deps", ["uv", "pip", "install",
@@ -113,6 +139,9 @@ def probe(project, version, execute=execute_command, *, import_name="",
         else:
             result["checks"].append({"stage": "tests", "ok": True,
                                      "detail": "SKIPPED: no tests directory"})
+        if result["exploratory"]:
+            result.update(status="EXPERIMENTAL_PASS",
+                          reason="Exploratory checks passed against relaxed metadata copy")
         return result
 
 
@@ -124,11 +153,13 @@ def main():
     parser.add_argument("--import-name", default="")
     parser.add_argument("--cli-command", default="")
     parser.add_argument("--test-requirements", default="pytest")
+    parser.add_argument("--explore-unsupported", action="store_true")
     args = parser.parse_args()
     try:
         result = probe(args.project, args.version, import_name=args.import_name,
                        cli_command=args.cli_command,
-                       test_requirements=args.test_requirements)
+                       test_requirements=args.test_requirements,
+                       explore_unsupported=args.explore_unsupported)
     except Exception as exc:
         result = {"version": args.version, "status": "INFRA",
                   "failed_stage": "runner",
