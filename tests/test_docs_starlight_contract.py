@@ -65,7 +65,7 @@ def test_docs_pages_are_complete_and_have_metadata():
 def test_sidebar_references_real_docs_pages():
     config = (SITE / "astro.config.mjs").read_text()
     for slug in SLUGS:
-        assert f"'docs/{slug}'" in config
+        assert f"'docs/{slug}'" in config if slug != "index" else "slug: 'docs'" in config
     assert "'./src/styles/starlight.css'" in config
     assert "pagefind: true" in config
 
