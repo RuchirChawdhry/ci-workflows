@@ -47,4 +47,4 @@ if ($env:GITHUB_OUTPUT) {
     "module-name=$name" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
     "module-version=$version" | Out-File $env:GITHUB_OUTPUT -Encoding utf8 -Append
 }
-Write-Host "Module package validated: $archive"
+Write-Output "Module package validated: $archive"
