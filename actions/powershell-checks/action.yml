@@ -1,0 +1,28 @@
+name: PowerShell quality checks
+description: Syntax, PSScriptAnalyzer and Pester checks for PowerShell scripts and modules.
+inputs:
+  minimum-powershell-version:
+    description: Minimum PowerShell 7 version
+    default: '7.6.9'
+  test-path:
+    description: Path containing Pester *.Tests.ps1 files
+    default: tests
+  require-tests:
+    description: Fail if no Pester tests exist
+    default: 'false'
+  results-path:
+    description: Relative path to JUnit XML report
+    default: reports/pester.xml
+runs:
+  using: composite
+  steps:
+    - name: Check PowerShell code
+      shell: pwsh
+      env:
+        MIN_PS_VERSION: ${{ inputs.minimum-powershell-version }}
+        TEST_PATH: ${{ inputs.test-path }}
+        REQUIRE_TESTS: ${{ inputs.require-tests }}
+        RESULTS_PATH: ${{ inputs.results-path }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        & (Join-Path $env:GITHUB_ACTION_PATH 'check.ps1')
