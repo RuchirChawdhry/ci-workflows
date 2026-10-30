@@ -95,3 +95,26 @@ def test_deployment_branch_and_permissions_unchanged():
     assert wf["jobs"]["website"]["uses"] == "./.github/workflows/pages-astro.yml"
     assert wf["jobs"]["website"]["with"]["site-path"] == "website"
     assert "github.event_name != 'pull_request'" in wf["jobs"]["website"]["with"]["publish"]
+
+
+def test_all_internal_documentation_links_resolve_to_real_pages():
+    from urllib.parse import urljoin, urlsplit
+
+    expected = {"/ci-workflows/docs/" if name == "index" else
+                f"/ci-workflows/docs/{name}/" for name in SLUGS}
+    for name in sorted(SLUGS):
+        source = (DOCS / f"{name}.md").read_text()
+        current = "/ci-workflows/docs/" if name == "index" else f"/ci-workflows/docs/{name}/"
+        for href in re.findall(r"\]\(([^)\s]+)(?:\s+[^)]*)?\)", source):
+            if href.startswith(("https://", "http://", "mailto:", "#")):
+                continue
+            target = urlsplit(urljoin("https://example.invalid" + current, href)).path
+            assert target in expected, f"{name}: {href} -> {target} is not a docs page"
+
+
+def test_project_base_is_not_duplicated_in_nav_edit_links_or_favicon():
+    config = (SITE / "astro.config.mjs").read_text()
+    landing = (SITE / "src/pages/index.astro").read_text()
+    assert "favicon: '/favicon.svg'" in config
+    assert "baseUrl: 'https://github.com/RuchirChawdhry/ci-workflows/edit/main/website/'" in config
+    assert "import.meta.env.BASE_URL.replace(/\\/?$/, '/')" in landing
