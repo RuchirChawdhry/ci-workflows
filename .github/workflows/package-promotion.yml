@@ -1,0 +1,98 @@
+name: Personal package release promotion
+
+on:
+  workflow_call:
+    inputs:
+      ecosystem:
+        description: scoop or homebrew
+        type: string
+        required: true
+      catalog:
+        description: Catalog of public GitHub projects to monitor
+        type: string
+        default: packages.json
+      dry-run:
+        description: Generate and validate without pushing or creating a PR
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout personal package repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Avoid duplicate automated pull requests
+        id: pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pattern='^automation/promote-'
+          if [[ "${{ inputs.ecosystem }}" == "scoop" ]]; then
+            pattern='^automation/(promote-|scoop-)'
+          fi
+          if gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+             --json headRefName --jq '.[].headRefName' | grep -Eq "$pattern"; then
+            echo "An automated promotion PR is already awaiting review."
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate Scoop manifests or Homebrew formulas
+        if: steps.pending.outputs.exists != 'true'
+        id: generate
+        uses: $/actions/package-promotion
+        with:
+          ecosystem: ${{ inputs.ecosystem }}
+          catalog: ${{ inputs.catalog }}
+
+      - name: Validate package metadata and create reviewable PR
+        if: steps.generate.outputs.changed == 'true' && !inputs.dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_ECOSYSTEM: ${{ inputs.ecosystem }}
+          PACKAGE_CATALOG: ${{ inputs.catalog }}
+        run: |
+          set -euo pipefail
+          if [[ "$PACKAGE_ECOSYSTEM" == 'scoop' ]]; then
+            directory=bucket
+            python3 -m json.tool "$PACKAGE_CATALOG" > /dev/null
+            for manifest in "$directory"/*.json; do
+              python3 -m json.tool "$manifest" > /dev/null
+            done
+          elif [[ "$PACKAGE_ECOSYSTEM" == 'homebrew' ]]; then
+            directory=Formula
+            for formula in "$directory"/*.rb; do
+              ruby -c "$formula"
+            done
+          else
+            echo "Invalid package ecosystem" >&2
+            exit 1
+          fi
+
+          git add -A -- "$directory"
+          if git diff --cached --quiet; then
+            echo "No actual package file changes. Skipping."
+            exit 0
+          fi
+          branch="automation/promote-$GITHUB_RUN_ID"
+          git switch -c "$branch"
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "chore($PACKAGE_ECOSYSTEM): propose public release updates"
+          git push origin "HEAD:refs/heads/$branch"
+          summary="$(git show --stat --oneline HEAD)"
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$branch" \
+            --title "chore($PACKAGE_ECOSYSTEM): promote latest public releases" \
+            --body "$(printf '## Proposed package updates\n\nValidated download bytes and hashes from public GitHub Releases.\n\n%s\n\n%s\n\n**Review required:** No automatic merge or writes to official package repositories.\n' "$summary" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
