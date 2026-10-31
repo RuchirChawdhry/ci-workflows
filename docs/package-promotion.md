@@ -91,7 +91,7 @@ In each package repository, enable **Settings > Actions > General >
 Workflow permissions > Allow GitHub Actions to create and approve pull requests**.
 The workflow creates PRs but never approves or merges them.
 
-One automated promotion PR at a time keeps review simple; subsequent scheduled
+Use `dry-run: true` in a pull-request check to generate candidate packages without\npushing a branch or opening a PR. The publication step is skipped entirely.\n\nFor Scoop, an open Excavator update PR also defers promotion, avoiding\noverlapping package proposals.\n\nOne automated promotion PR at a time keeps review simple; subsequent scheduled
 runs skip until the current PR is merged or closed. When `packages.json`
 contains no packages, the workflow makes no changes.
 
