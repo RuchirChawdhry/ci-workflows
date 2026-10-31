@@ -29,7 +29,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Python CLI quality checks
-        uses: $/actions/python-checks
+        uses: RuchirChawdhry/ci-workflows/actions/python-checks@main
         with:
           python-version: ${{ inputs.python-version }}
           cli-command: ${{ inputs.cli-command }}
