@@ -11,6 +11,10 @@ on:
         description: Catalog of public GitHub projects to monitor
         type: string
         default: packages.json
+      dry-run:
+        description: Generate and validate without pushing or creating a PR
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,8 +36,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          pattern='^automation/promote-'
+          if [[ "${{ inputs.ecosystem }}" == "scoop" ]]; then
+            pattern='^automation/(promote-|scoop-)'
+          fi
           if gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
-             --json headRefName --jq '.[].headRefName' | grep -q '^automation/promote-'; then
+             --json headRefName --jq '.[].headRefName' | grep -Eq "$pattern"; then
             echo "An automated promotion PR is already awaiting review."
             echo 'exists=true' >> "$GITHUB_OUTPUT"
           fi
@@ -47,7 +55,7 @@ jobs:
           catalog: ${{ inputs.catalog }}
 
       - name: Validate package metadata and create reviewable PR
-        if: steps.generate.outputs.changed == 'true'
+        if: steps.generate.outputs.changed == 'true' && !inputs.dry-run
         env:
           GH_TOKEN: ${{ github.token }}
           PACKAGE_ECOSYSTEM: ${{ inputs.ecosystem }}
