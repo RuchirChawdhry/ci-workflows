@@ -135,3 +135,15 @@ def test_action_uses_only_public_release_artifacts():
     assert "/releases/latest" in body
     assert "browser_download_url" in body
     assert "https://github.com/" in body
+
+def test_dry_run_never_writes_pr_and_scoop_avoids_excavator():
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/package-promotion.yml").read_text(),
+        Loader=yaml.BaseLoader
+    )
+    assert workflow["on"]["workflow_call"]["inputs"]["dry-run"]["default"] == "false"
+    steps = workflow["jobs"]["promote"]["steps"]
+    publish = next(s for s in steps if "create reviewable PR" in s["name"])
+    assert "!inputs.dry-run" in publish["if"]
+    pending = next(s for s in steps if "duplicate" in s["name"])
+    assert "scoop-" in pending["run"]
