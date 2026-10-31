@@ -91,7 +91,13 @@ In each package repository, enable **Settings > Actions > General >
 Workflow permissions > Allow GitHub Actions to create and approve pull requests**.
 The workflow creates PRs but never approves or merges them.
 
-Use `dry-run: true` in a pull-request check to generate candidate packages without\npushing a branch or opening a PR. The publication step is skipped entirely.\n\nFor Scoop, an open Excavator update PR also defers promotion, avoiding\noverlapping package proposals.\n\nOne automated promotion PR at a time keeps review simple; subsequent scheduled
+Use `dry-run: true` in a pull-request check to generate candidate packages without
+pushing a branch or opening a PR. The publication step is skipped entirely.
+
+For Scoop, an open Excavator update PR also defers promotion, avoiding
+overlapping package proposals.
+
+One automated promotion PR at a time keeps review simple; subsequent scheduled
 runs skip until the current PR is merged or closed. When `packages.json`
 contains no packages, the workflow makes no changes.
 
@@ -101,7 +107,8 @@ tests before the public release, and the generated proposal should be reviewed
 before merge. The proposed files are syntax-checked by the promotion workflow.
 This scheme is polling-based; releases are picked up at the next scheduled run.
 
-Note: GitHub Actions PRs made with `GITHUB_TOKEN` do not necessarily trigger
-other workflows, by design. Any required follow-on native installation validation
-should run explicitly **before proposal creation**, or use a GitHub App token to
-enable the normal PR check path. Do not assume PR creation alone triggered checks.
+GitHub can queue `pull_request` checks for PRs created with `GITHUB_TOKEN`,
+but they require a maintainer to choose **Approve workflows to run**.
+A GitHub App token can avoid this approval requirement. The promotion workflow
+also performs its own metadata and syntax checks before proposing updates.
+Review real platform installation evidence before merging.
