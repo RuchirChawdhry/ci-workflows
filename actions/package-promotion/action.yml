@@ -1,0 +1,32 @@
+name: Prepare personal package repository updates
+description: Resolve public GitHub releases and produce Scoop manifests or Homebrew formulas.
+inputs:
+  ecosystem:
+    description: scoop or homebrew
+    required: true
+  catalog:
+    description: JSON catalog of applications managed by this repository
+    default: packages.json
+outputs:
+  changed:
+    description: Whether generated packages differ from existing ones
+    value: ${{ steps.generate.outputs.changed }}
+  updated-count:
+    description: Number of new or changed package files
+    value: ${{ steps.generate.outputs.updated-count }}
+runs:
+  using: composite
+  steps:
+    - name: Generate exact-checksum packages from latest public releases
+      shell: bash
+      id: generate
+      env:
+        PACKAGE_ECOSYSTEM: ${{ inputs.ecosystem }}
+        PACKAGE_CATALOG: ${{ inputs.catalog }}
+      run: |
+        set -euo pipefail
+        python3 "$GITHUB_ACTION_PATH/promote.py" \
+          --ecosystem "$PACKAGE_ECOSYSTEM" \
+          --catalog "$PACKAGE_CATALOG" \
+          --root . \
+          --github-output "$GITHUB_OUTPUT"
