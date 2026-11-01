@@ -1,6 +1,5 @@
 """Contracts for the uv-only Python CLI composite action and its wrapper."""
 
-import re
 from pathlib import Path
 
 import yaml
@@ -28,11 +27,8 @@ def test_python_cli_wrapper_delegates_quality_to_composite_action():
     assert len(steps) == 2
     assert steps[0]["uses"].startswith("actions/checkout@")
     assert steps[0]["with"]["persist-credentials"] == "false"
-    # A relative action path would point to the calling repository.
-    assert re.fullmatch(
-        r"RuchirChawdhry/ci-workflows/actions/python-checks@(?:main|[0-9a-f]{40})",
-        steps[1]["uses"],
-    )
+    # Self-repository syntax pins the action to the called workflow's own commit.
+    assert steps[1]["uses"] == "$/actions/python-checks"
     assert steps[1]["with"] == {
         "python-version": "${{ inputs.python-version }}",
         "cli-command": "${{ inputs.cli-command }}",

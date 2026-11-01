@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 
 import yaml
@@ -28,14 +27,8 @@ def test_build_checks_metadata_and_artifacts():
     assert 'uv build' in blob and '--sdist' in blob and '--wheel' in blob
     assert 'twine check --strict' in blob
     assert any('actions/upload-artifact@' in step.get('uses', '') and step['with']['if-no-files-found'] == 'error' for step in steps)
-    # Reusable workflows check out the caller's repo, so the shared action must be remote.
-    assert any(
-        re.fullmatch(
-            r"RuchirChawdhry/ci-workflows/actions/test-python-cli@(?:main|[0-9a-f]{40})",
-            step.get("uses", ""),
-        )
-        for step in steps
-    )
+    # Self-repository syntax pins the action to the called workflow's own commit.
+    assert any(step.get('uses') == '$/actions/test-python-cli' for step in steps)
 
 
 def test_install_smoke_uses_isolated_wheel_not_local_sources():
