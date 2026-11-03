@@ -63,5 +63,6 @@ jobs:
             }
           }
 
-          task --taskfile ./Taskfile.yml --list
+          $tasks = task --taskfile ./Taskfile.yml --list-all --silent
+          if ($LASTEXITCODE -ne 0 -or 'bootstrap' -notin @($tasks)) { throw 'Task discovery failed' }
           task --taskfile ./Taskfile.yml status
