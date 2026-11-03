@@ -23,4 +23,6 @@ def test_reusable_bootstrap_executes_and_verifies_real_installation():
     assert "ConvertFrom-Yaml" in verify
     assert "Missing Scoop packages" in verify
     assert "Missing WinGet package" in verify
+    assert "task --taskfile ./Taskfile.yml --list-all --silent" in verify
+    assert "Task discovery failed" in verify
     assert "task --taskfile ./Taskfile.yml status" in verify
