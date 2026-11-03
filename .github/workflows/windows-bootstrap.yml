@@ -1,0 +1,67 @@
+name: Windows Taskfile bootstrap
+
+on:
+  workflow_call:
+    inputs:
+      config-path:
+        description: Repository YAML to provision (copied to the runner profile)
+        type: string
+        required: true
+      runs-on:
+        description: Windows runner label
+        type: string
+        default: windows-2025
+      timeout-minutes:
+        description: Provisioning time budget
+        type: number
+        default: 60
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Bootstrap ${{ inputs.config-path }}
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Checkout calling repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Seed the user-profile configuration
+        shell: pwsh
+        env:
+          CONFIG_PATH: ${{ inputs.config-path }}
+        run: |
+          Copy-Item (Join-Path $env:GITHUB_WORKSPACE $env:CONFIG_PATH) "$HOME/.app-config.yml" -Force
+
+      - name: Execute the real bootstrap entrypoint
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -NonInteractive -File ./bootstrap.ps1
+          exit $LASTEXITCODE
+
+      - name: Verify provisioned packages and Taskfile commands
+        shell: pwsh
+        run: |
+          $env:SCOOP = "$HOME/Tools/Scoop"
+          $env:Path = "$env:SCOOP/shims;$env:Path"
+          $env:PSModulePath = "$HOME/Tools/PowerShell/Modules;$env:PSModulePath"
+          Import-Module Yayaml
+          $config = Get-Content "$HOME/.app-config.yml" -Raw | ConvertFrom-Yaml
+
+          $packages = @($config.scoop.apps.GetEnumerator() | ForEach-Object { $_.Value }) + @($config.languages) + @('git', 'aria2', 'task')
+          $missing = $packages | Sort-Object -Unique | Where-Object { -not (Test-Path "$env:SCOOP/apps/$_/current") }
+          if ($missing) { throw "Missing Scoop packages: $($missing -join ', ')" }
+
+          if ($config.winget.enabled) {
+            $config.winget.apps | ForEach-Object {
+              $result = winget list --id $_ --exact --accept-source-agreements
+              if ($LASTEXITCODE -ne 0 -or -not ($result -match [regex]::Escape($_))) { throw "Missing WinGet package: $_" }
+            }
+          }
+
+          task --taskfile ./Taskfile.yml --list
+          task --taskfile ./Taskfile.yml status
