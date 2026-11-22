@@ -1,0 +1,26 @@
+name: Python monorepo consumer smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/python-cli.yml'
+      - '.github/workflows/python-monorepo-smoke.yml'
+      - 'actions/python-checks/**'
+      - 'tests/test_python_checks_contract.py'
+      - 'tests/fixtures/python-monorepo/**'
+      - 'docs/python-cli.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uv-workspace-member:
+    name: Nested uv workspace member with custom quality group
+    uses: ./.github/workflows/python-cli.yml
+    with:
+      python-version: '3.14.7'
+      project-path: tests/fixtures/python-monorepo/packages/widget
+      workspace-package: ci-workflows-widget
+      dev-group: quality
+      test-command: pytest -q tests -k greeting
