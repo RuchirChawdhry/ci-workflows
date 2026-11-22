@@ -1,0 +1,31 @@
+name: Node.js CI consumer smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/node-ci*.yml'
+      - 'tests/test_node_ci_contract.py'
+      - 'tests/fixtures/node-app/**'
+      - 'docs/node-ci.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-linux:
+    name: npm fixture on Linux
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      project-path: tests/fixtures/node-app
+      package-manager: npm
+      artifact-path: tests/fixtures/node-app/dist/index.js
+      artifact-name: node-ci-smoke-linux
+
+  npm-windows:
+    name: npm fixture on Windows, custom typecheck
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      runs-on: windows-2025
+      project-path: tests/fixtures/node-app
+      typecheck-command: node --check src/index.js

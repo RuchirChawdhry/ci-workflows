@@ -1,0 +1,218 @@
+name: Node.js CI
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: GitHub Actions runner label
+        type: string
+        default: ubuntu-latest
+      node-version:
+        description: Node.js version
+        type: string
+        default: '24'
+      project-path:
+        description: Directory containing package.json and its lockfile
+        type: string
+        default: '.'
+      package-manager:
+        description: auto, npm, pnpm, or yarn
+        type: string
+        default: auto
+      install-command:
+        description: auto for a frozen install, or a complete shell command
+        type: string
+        default: auto
+      typecheck-command:
+        description: auto for typecheck script, complete shell command, or empty to skip
+        type: string
+        default: auto
+      lint-command:
+        description: auto for lint script, complete shell command, or empty to skip
+        type: string
+        default: auto
+      test-command:
+        description: auto for test script, complete shell command, or empty to skip
+        type: string
+        default: auto
+      build-command:
+        description: auto for build script, complete shell command, or empty to skip
+        type: string
+        default: auto
+      artifact-path:
+        description: Optional build output glob relative to repository root
+        type: string
+        default: ''
+      artifact-name:
+        description: Optional uploaded build artifact name
+        type: string
+        default: node-build
+      timeout-minutes:
+        description: Job time limit
+        type: number
+        default: 30
+    outputs:
+      artifact-id:
+        description: Uploaded build artifact ID, if enabled
+        value: ${{ jobs.quality.outputs.artifact-id }}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Node.js quality and build
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.project-path }}
+    steps:
+      - name: Check out consumer project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          package-manager-cache: false
+
+      - name: Resolve package manager and lockfile
+        id: manager
+        env:
+          REQUESTED_MANAGER: ${{ inputs.package-manager }}
+        run: |
+          set -euo pipefail
+          test -f package.json || { echo 'package.json is required in project-path' >&2; exit 1; }
+          managers=()
+          if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then managers+=(npm); fi
+          if [[ -f pnpm-lock.yaml ]]; then managers+=(pnpm); fi
+          if [[ -f yarn.lock ]]; then managers+=(yarn); fi
+          if (( ${#managers[@]} != 1 )); then
+            echo 'Exactly one package manager lockfile is required (npm, pnpm, or yarn).' >&2
+            exit 1
+          fi
+          detected="$managers"
+          case "$REQUESTED_MANAGER" in
+            auto) manager="$detected" ;;
+            npm|pnpm|yarn) manager="$REQUESTED_MANAGER" ;;
+            *) echo "Unsupported package manager: $REQUESTED_MANAGER" >&2; exit 1 ;;
+          esac
+          if [[ "$manager" != "$detected" ]]; then
+            echo "Requested $manager but lockfile belongs to $detected" >&2
+            exit 1
+          fi
+          declared="$(node -p "require('./package.json').packageManager || ''")"
+          if [[ -n "$declared" && "$declared" != "$manager@"* ]]; then
+            echo "package.json packageManager ($declared) conflicts with $manager lockfile" >&2
+            exit 1
+          fi
+          if [[ "$manager" != npm && -z "$declared" ]]; then
+            echo 'pnpm/Yarn projects must pin packageManager in package.json' >&2
+            exit 1
+          fi
+          echo "manager=$manager" >> "$GITHUB_OUTPUT"
+
+      - name: Set up pinned package manager
+        if: steps.manager.outputs.manager != 'npm'
+        env:
+          PACKAGE_MANAGER: ${{ steps.manager.outputs.manager }}
+        run: |
+          set -euo pipefail
+          if ! command -v corepack >/dev/null 2>&1; then
+            npm install --global corepack@0.34.5
+          fi
+          corepack "$PACKAGE_MANAGER" --version
+
+      - name: Install dependencies from lockfile
+        env:
+          PACKAGE_MANAGER: ${{ steps.manager.outputs.manager }}
+          INSTALL_COMMAND: ${{ inputs.install-command }}
+        run: |
+          set -euo pipefail
+          if [[ "$INSTALL_COMMAND" == auto ]]; then
+            case "$PACKAGE_MANAGER" in
+              npm) npm ci --no-audit --no-fund ;;
+              pnpm) corepack pnpm install --frozen-lockfile ;;
+              yarn)
+                version="$(corepack yarn --version)"
+                if [[ "$version" == 1.* ]]; then
+                  corepack yarn install --frozen-lockfile
+                else
+                  corepack yarn install --immutable
+                fi
+                ;;
+            esac
+          elif [[ -n "$INSTALL_COMMAND" ]]; then
+            bash -e -o pipefail -c "$INSTALL_COMMAND"
+          else
+            echo 'install-command cannot be empty' >&2
+            exit 1
+          fi
+
+      - name: Typecheck
+        if: ${{ inputs.typecheck-command != '' }}
+        env:
+          PACKAGE_MANAGER: ${{ steps.manager.outputs.manager }}
+          STAGE_COMMAND: ${{ inputs.typecheck-command }}
+        run: |
+          set -euo pipefail
+          if [[ "$STAGE_COMMAND" == auto ]]; then
+            if [[ "$PACKAGE_MANAGER" == npm ]]; then npm run typecheck; else corepack "$PACKAGE_MANAGER" run typecheck; fi
+          else
+            bash -e -o pipefail -c "$STAGE_COMMAND"
+          fi
+
+      - name: Lint
+        if: ${{ inputs.lint-command != '' }}
+        env:
+          PACKAGE_MANAGER: ${{ steps.manager.outputs.manager }}
+          STAGE_COMMAND: ${{ inputs.lint-command }}
+        run: |
+          set -euo pipefail
+          if [[ "$STAGE_COMMAND" == auto ]]; then
+            if [[ "$PACKAGE_MANAGER" == npm ]]; then npm run lint; else corepack "$PACKAGE_MANAGER" run lint; fi
+          else
+            bash -e -o pipefail -c "$STAGE_COMMAND"
+          fi
+
+      - name: Unit tests
+        if: ${{ inputs.test-command != '' }}
+        env:
+          PACKAGE_MANAGER: ${{ steps.manager.outputs.manager }}
+          STAGE_COMMAND: ${{ inputs.test-command }}
+        run: |
+          set -euo pipefail
+          if [[ "$STAGE_COMMAND" == auto ]]; then
+            if [[ "$PACKAGE_MANAGER" == npm ]]; then npm run test; else corepack "$PACKAGE_MANAGER" run test; fi
+          else
+            bash -e -o pipefail -c "$STAGE_COMMAND"
+          fi
+
+      - name: Build application
+        if: ${{ inputs.build-command != '' }}
+        env:
+          PACKAGE_MANAGER: ${{ steps.manager.outputs.manager }}
+          STAGE_COMMAND: ${{ inputs.build-command }}
+        run: |
+          set -euo pipefail
+          if [[ "$STAGE_COMMAND" == auto ]]; then
+            if [[ "$PACKAGE_MANAGER" == npm ]]; then npm run build; else corepack "$PACKAGE_MANAGER" run build; fi
+          else
+            bash -e -o pipefail -c "$STAGE_COMMAND"
+          fi
+
+      - name: Upload validated build artifact
+        if: ${{ inputs.artifact-path != '' && inputs.build-command != '' }}
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.artifact-path }}
+          if-no-files-found: error
+          retention-days: 7
