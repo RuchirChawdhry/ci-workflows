@@ -13,7 +13,7 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
-INCLUDED = (".github/workflows", "actions", "assets", "README.md", "LICENSE")
+INCLUDED = (".github/workflows", "actions", "scripts", "assets", "README.md", "LICENSE")
 TAG_PATTERN = re.compile(r"weekly-(\d{4}-\d{2}-\d{2})\Z")
 
 

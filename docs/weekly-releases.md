@@ -26,12 +26,13 @@ All tracked files under:
 ```text
 .github/workflows/
 actions/
+scripts/
 assets/
 README.md
 LICENSE
 ```
 
-Tests, documentation outside the README, scripts, and website sources are **not
+Tests, documentation outside the README, templates, and website sources are **not
 part of the bundle**. The exact folder hierarchy is retained. Because the ZIP
 does not contain `docs/`, links in README that point to repository documentation
 work on GitHub rather than in a fully offline copy.

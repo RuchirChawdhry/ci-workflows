@@ -93,6 +93,6 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Weekly snapshot $SNAPSHOT_TAG" \
-            --notes "Automated snapshot of .github/workflows/, actions/, assets/, README.md and LICENSE. Published only when included files differ from the previous weekly release." \
+            --notes "Automated snapshot of .github/workflows/, actions/, scripts/, assets/, README.md and LICENSE. Published only when included files differ from the previous weekly release." \
             --generate-notes \
             --latest

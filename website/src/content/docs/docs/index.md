@@ -16,6 +16,7 @@ New to reusable workflows? Follow [Getting Started](./getting-started/) to run y
 | Python | [Python CLI](./workflows/python-cli/) | Quality checks using uv, Ruff, and pytest |
 | Python | [Python Build](./workflows/python-build/) | Validate a wheel and source distribution |
 | Python | [Compatibility Explorer](./workflows/python-compat/) | Diagnose version-specific failures |
+| JavaScript / TypeScript | [Node.js CI](./workflows/node-ci/) | Install, check, test, and build npm/pnpm/Yarn projects |
 | PowerShell | [PowerShell CI](./workflows/powershell/) | Parse, analyze, and optionally run Pester |
 | Windows | [Scoop](./workflows/scoop/) | Test and generate a portable Scoop manifest |
 | macOS | [Homebrew](./workflows/homebrew/) | Verify a formula with an isolated local tap |
