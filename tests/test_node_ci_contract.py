@@ -40,7 +40,7 @@ def test_manager_detection_and_frozen_installs():
                   "corepack yarn install --frozen-lockfile",
                   "corepack yarn install --immutable"):
         assert token in install["run"]
-    assert install["env"]["INSTALL_COMMAND"] == "${{ inputs.install-command }"
+    assert install["env"]["INSTALL_COMMAND"] == "${{ inputs.install-command }}"
 
 
 def test_check_stages_are_configurable_and_do_not_interpolate_untrusted_code():
