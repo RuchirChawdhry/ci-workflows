@@ -11,6 +11,22 @@ on:
         description: GitHub-hosted runner label
         type: string
         default: ubuntu-slim
+      project-path:
+        description: Directory containing the project's pyproject.toml
+        type: string
+        default: '.'
+      dev-group:
+        description: uv dependency group to include, in addition to configured default groups
+        type: string
+        default: dev
+      test-command:
+        description: Shell command executed in the uv environment, or empty to skip tests
+        type: string
+        default: pytest -q
+      workspace-package:
+        description: Optional uv workspace member name to sync instead of workspace root
+        type: string
+        default: ''
       cli-command:
         description: Optional installed CLI command to smoke-test with --help
         type: string
@@ -32,4 +48,8 @@ jobs:
         uses: $/actions/python-checks
         with:
           python-version: ${{ inputs.python-version }}
+          project-path: ${{ inputs.project-path }}
+          dev-group: ${{ inputs.dev-group }}
+          test-command: ${{ inputs.test-command }}
+          workspace-package: ${{ inputs.workspace-package }}
           cli-command: ${{ inputs.cli-command }}

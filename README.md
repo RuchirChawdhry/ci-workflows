@@ -26,7 +26,7 @@ Python workflows intentionally use **uv** throughout. This is an opinionated too
 
 | Area | Tools & capabilities |
 |---|---|
-| Python | uv, Ruff, pytest, wheel builds, compatibility checks |
+| Python | [uv monorepo CI](docs/python-cli.md), Ruff, pytest, wheel builds, compatibility checks |
 | JavaScript / TypeScript | [Node.js CI](docs/node-ci.md), Electron, Svelte, npm/pnpm/Yarn, builds |
 | PowerShell | PSScriptAnalyzer, Pester, syntax validation |
 | Packaging | Scoop, build artifacts, GitHub Releases |

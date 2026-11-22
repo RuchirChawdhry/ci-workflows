@@ -6,6 +6,22 @@ inputs:
     description: Python version to test
     required: false
     default: '3.14.7'
+  project-path:
+    description: Directory containing pyproject.toml, relative to the consumer repository root
+    required: false
+    default: '.'
+  dev-group:
+    description: uv dependency group to install in addition to default groups
+    required: false
+    default: dev
+  test-command:
+    description: Test command to run inside the uv environment, or empty to skip
+    required: false
+    default: pytest -q
+  workspace-package:
+    description: Optional uv workspace member name to sync
+    required: false
+    default: ''
   cli-command:
     description: Optional installed CLI executable name to smoke-test with --help
     required: false
@@ -20,27 +36,53 @@ runs:
         version: latest-known
     - name: Install Python and project dependencies
       shell: bash
+      working-directory: ${{ inputs.project-path }}
       env:
         PYTHON_VERSION: ${{ inputs.python-version }}
+        DEV_GROUP: ${{ inputs.dev-group }}
+        WORKSPACE_PACKAGE: ${{ inputs.workspace-package }}
       run: |
         set -euo pipefail
+        if [[ ! -f pyproject.toml ]]; then
+          echo 'project-path must contain pyproject.toml' >&2
+          exit 1
+        fi
+        for value in "$DEV_GROUP" "$WORKSPACE_PACKAGE"; do
+          if [[ -n "$value" && ! "$value" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+            echo "Invalid dependency group or workspace package: $value" >&2
+            exit 1
+          fi
+        done
         uv python install "$PYTHON_VERSION"
-        uv sync --python "$PYTHON_VERSION" --group dev
+        sync_args=(--python "$PYTHON_VERSION")
+        if [[ -n "$DEV_GROUP" ]]; then sync_args+=(--group "$DEV_GROUP"); fi
+        if [[ -n "$WORKSPACE_PACKAGE" ]]; then sync_args+=(--package "$WORKSPACE_PACKAGE"); fi
+        uv sync "${sync_args[@]}"
     - name: Verify Python
       shell: bash
+      working-directory: ${{ inputs.project-path }}
       run: uv run --no-sync python --version
     - name: Lint
       shell: bash
+      working-directory: ${{ inputs.project-path }}
       run: uv run --no-sync ruff check .
     - name: Check formatting
       shell: bash
+      working-directory: ${{ inputs.project-path }}
       run: uv run --no-sync ruff format --check .
     - name: Test
+      if: ${{ inputs.test-command != '' }}
       shell: bash
-      run: uv run --no-sync pytest -q
+      working-directory: ${{ inputs.project-path }}
+      env:
+        TEST_COMMAND: ${{ inputs.test-command }}
+      run: |
+        set -euo pipefail
+        uv run --no-sync bash -e -o pipefail -c "$TEST_COMMAND"
     - name: CLI help smoke test
       if: ${{ inputs.cli-command != '' }}
       shell: bash
+      working-directory: ${{ inputs.project-path }}
       env:
         CLI_COMMAND: ${{ inputs.cli-command }}
       run: uv run --no-sync "$CLI_COMMAND" --help
