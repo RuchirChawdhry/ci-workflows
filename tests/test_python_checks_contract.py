@@ -81,18 +81,18 @@ def test_python_monorepo_scoping_custom_group_and_test_command():
     steps = action["runs"]["steps"]
     for step in steps:
         if "run" in step:
-            assert step["working-directory"] == ${{ inputs.project-path }}
+            assert step["working-directory"] == "${{ inputs.project-path }}"
     install = next(step for step in steps if step["name"] == "Install Python and project dependencies")
-    assert install["env"]["DEV_GROUP"] == ${{ inputs.dev-group }}
-    assert install["env"]["WORKSPACE_PACKAGE"] == ${{ inputs.workspace-package }}
+    assert install["env"]["DEV_GROUP"] == "${{ inputs.dev-group }}"
+    assert install["env"]["WORKSPACE_PACKAGE"] == "${{ inputs.workspace-package }}"
     assert 'sync_args+=(--group "$DEV_GROUP")' in install["run"]
     assert 'sync_args+=(--package "$WORKSPACE_PACKAGE")' in install["run"]
     assert 'uv sync "${sync_args[@]}"' in install["run"]
     test = next(step for step in steps if step["name"] == "Test")
-    assert test["if"] == ${{ inputs.test-command != '' }}
-    assert test["env"]["TEST_COMMAND"] == ${{ inputs.test-command }}
+    assert test["if"] == "${{ inputs.test-command != '' }}"
+    assert test["env"]["TEST_COMMAND"] == "${{ inputs.test-command }}"
     assert '"$TEST_COMMAND"' in test["run"]
-    assert ${{ "inputs." } not in test["run"]
+    assert "${{" not in test["run"]
 
 
 def test_real_workspace_fixture_and_consumer_smoke():
