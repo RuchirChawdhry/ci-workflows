@@ -1,0 +1,12 @@
+{
+  "name": "node-ci-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node --check src/index.js",
+    "lint": "node --check src/index.js && node --check test/index.test.js",
+    "test": "node --test",
+    "build": "node scripts/build.mjs"
+  }
+}

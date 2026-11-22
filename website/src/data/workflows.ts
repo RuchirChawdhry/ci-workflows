@@ -28,6 +28,15 @@ export const workflows = [
   },
   {
     eyebrow: "04 / Quality",
+    title: "Node.js CI",
+    icon: "🟩",
+    className: "python",
+    description: "Install, typecheck, lint, test, and build JavaScript or TypeScript projects.",
+    path: "node-ci.yml",
+    label: "Testing",
+  },
+  {
+    eyebrow: "05 / Quality",
     title: "PowerShell CI",
     icon: "⚡",
     className: "powershell",
@@ -36,7 +45,7 @@ export const workflows = [
     label: "Testing",
   },
   {
-    eyebrow: "05 / Windows",
+    eyebrow: "06 / Windows",
     title: "Scoop",
     icon: "🪟",
     className: "scoop",
@@ -45,7 +54,7 @@ export const workflows = [
     label: "Packaging",
   },
   {
-    eyebrow: "06 / macOS",
+    eyebrow: "07 / macOS",
     title: "Homebrew",
     icon: "🍺",
     className: "homebrew",
@@ -54,7 +63,7 @@ export const workflows = [
     label: "Packaging",
   },
   {
-    eyebrow: "07 / Websites",
+    eyebrow: "08 / Websites",
     title: "Astro Pages",
     icon: "🌐",
     className: "astro",
@@ -63,7 +72,7 @@ export const workflows = [
     label: "Deployment",
   },
   {
-    eyebrow: "08 / Documentation",
+    eyebrow: "09 / Documentation",
     title: "PowerShell Module Docs",
     icon: "📚",
     className: "module-docs",

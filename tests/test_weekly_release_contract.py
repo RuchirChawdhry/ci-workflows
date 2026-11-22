@@ -35,6 +35,7 @@ def repository(tmp_path):
         ".github/workflows/sample.yml": "name: Sample\n",
         "actions/sample/action.yml": "name: Sample\n",
         "actions/sample/run.py": "print('sample')\n",
+        "scripts/example.py": "print(123)\n",
         "assets/logo.svg": "<svg></svg>\n",
         "README.md": "# Hello\n",
         "LICENSE": "MIT\n",
@@ -76,7 +77,7 @@ def test_bundle_file_selection_is_exact(tmp_path):
     mod = load_script()
     repository(tmp_path)
     assert mod.INCLUDED == (
-        ".github/workflows", "actions", "assets", "README.md", "LICENSE"
+        ".github/workflows", "actions", "scripts", "assets", "README.md", "LICENSE"
     )
     archive, checksum = mod.make_bundle(tmp_path, "HEAD", "weekly-2026-11-01", tmp_path / "dist")
     assert archive.name == "ci-workflows-weekly-2026-11-01.zip"
@@ -87,6 +88,7 @@ def test_bundle_file_selection_is_exact(tmp_path):
             ".github/workflows/sample.yml",
             "actions/sample/action.yml",
             "actions/sample/run.py",
+            "scripts/example.py",
             "assets/logo.svg",
             "README.md", "LICENSE",
         }
@@ -105,6 +107,16 @@ def test_only_distributable_changes_trigger_release(tmp_path):
     (tmp_path / "website/index.html").write_text("Changed\n")
     git(tmp_path, "add", ".")
     git(tmp_path, "commit", "-qm", "tests and website")
+    assert not mod.has_changes(tmp_path, base, "HEAD")
+
+    (tmp_path / "scripts/example.py").write_text("print(456)\n")
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-qm", "helper changed")
+    assert mod.has_changes(tmp_path, base, "HEAD")
+
+    (tmp_path / "scripts/example.py").write_text(files["scripts/example.py"])
+    git(tmp_path, "add", ".")
+    git(tmp_path, "commit", "-qm", "revert helper")
     assert not mod.has_changes(tmp_path, base, "HEAD")
 
     (tmp_path / "assets/logo.svg").write_text("<svg>new</svg>\n")
