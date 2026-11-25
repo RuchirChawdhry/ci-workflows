@@ -350,6 +350,18 @@ jobs:
                   for name, _, leaves in projects:
                       summary.write(f"- {name}: {len(leaves)} sitemap(s)\n")
           PY
+      - name: Checkout shared structured data generator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-workflows
+          persist-credentials: false
+      - name: Generate and validate portfolio structured data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .ci-workflows/scripts/structured_data.py portfolio --dist dist --origin "https://${GITHUB_REPOSITORY_OWNER,,}.github.io/"
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:

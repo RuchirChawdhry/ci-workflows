@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ job.workflow_repository }}
@@ -52,6 +53,11 @@ jobs:
         run: |
           npm ci --prefix "$RUNNER_TEMP/wiki-docs" --no-audit --no-fund
           npm --prefix "$RUNNER_TEMP/wiki-docs" run build
+      - name: Generate and validate structured data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .ci-workflows/scripts/structured_data.py wiki --dist "$RUNNER_TEMP/wiki-docs/dist" --origin "$DOCS_SITE$DOCS_BASE/"
       - name: Validate agent documentation and sitemap
         run: |
           python3 .ci-workflows/scripts/validate_wiki_docs.py "$RUNNER_TEMP/wiki-docs/dist" "$DOCS_SITE$DOCS_BASE/"

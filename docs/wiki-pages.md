@@ -15,3 +15,5 @@ jobs:
 ```
 
 Set repository Settings → Pages → Source to GitHub Actions before deployment. Grant contents: read, pages: write, id-token: write in the caller. The workflow assumes the default github.io project URL; custom domains and nested wiki assets are outside this initial implementation. The llms.txt format is a proposal for documentation consumption, not an indexing guarantee.
+
+See [structured data generation and overrides](structured-data.md) for the shared JSON-LD implementation.

@@ -33,3 +33,5 @@ Crawler names are maintained using [Cloudflare's bot reference](https://develope
 ## Domain-wide AI documentation index
 
 The same repository enumeration probes `/llms.txt` independently of XML sitemap discovery. A public Pages-enabled project is included when its project-level file resolves directly to UTF-8 text with a nonempty Markdown H1. Missing files, redirected URLs and HTML error responses are excluded. The generated root `llms.txt` lists verified project indexes with repository descriptions; agents follow those indexes for individual Markdown pages or complete documentation. The root homepage links to it. The index is regenerated on the existing schedule, without downloading complete project documentation or duplicating it. It does not change the HTML sitemap or guarantee AI citations.
+
+The portfolio homepage includes a validated JSON-LD graph for the developer identity, website and project collection. See [structured data](structured-data.md).
