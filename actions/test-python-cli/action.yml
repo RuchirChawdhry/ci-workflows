@@ -9,6 +9,14 @@ inputs:
     description: Python version for the isolated environment
     required: false
     default: '3.14.7'
+  smoke-test:
+    description: Optional path to pytest functional tests of the installed executable
+    required: false
+    default: ''
+  junit-path:
+    description: Optional absolute JUnit XML output path for functional smoke tests
+    required: false
+    default: ''
   dist-dir:
     description: Directory containing exactly one wheel
     required: false
@@ -22,6 +30,8 @@ runs:
         CLI_COMMAND: ${{ inputs.cli-command }}
         PYTHON_VERSION: ${{ inputs.python-version }}
         DIST_DIR: ${{ inputs.dist-dir }}
+        SMOKE_TEST: ${{ inputs.smoke-test }}
+        JUNIT_PATH: ${{ inputs.junit-path }}
       run: |
         set -euo pipefail
         if [[ ! "$CLI_COMMAND" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
@@ -38,3 +48,13 @@ runs:
         uv venv --python "$PYTHON_VERSION" "$venv"
         uv pip install --python "$venv/bin/python" "${wheels[0]}"
         "$venv/bin/$CLI_COMMAND" --help
+        if [[ -n "$SMOKE_TEST" ]]; then
+          smoke_test="$(realpath "$SMOKE_TEST")"
+          uv pip install --python "$venv/bin/python" pytest
+          export CLI_EXECUTABLE="$venv/bin/$CLI_COMMAND"
+          unset PYTHONPATH
+          cd "$(mktemp -d)"
+          args=()
+          if [[ -n "$JUNIT_PATH" ]]; then args+=(--junitxml="$JUNIT_PATH"); fi
+          "$venv/bin/python" -I -m pytest -q --import-mode=importlib "${args[@]}" "$smoke_test"
+        fi

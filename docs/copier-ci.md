@@ -26,12 +26,14 @@ add `with: {profile: winui}` to the job; for Chromium extensions use
 
 | Profile | Runner | Generated project checks |
 | --- | --- | --- |
-| python | ubuntu-24.04 | uv sync, Ruff lint and format, pytest, wheel and sdist, strict Twine, isolated installed CLI help |
+| python | ubuntu-24.04 | uv sync, Ruff lint and format, pytest, wheel and sdist, strict Twine, isolated installed CLI functional tests |
 | winui | windows-latest | uv sync, Ruff lint and format, pytest, wheel and sdist, Twine, isolated wheel installation and GUI entry-point metadata |
 | chromium | ubuntu-24.04 | pnpm install, Svelte/TS typecheck, Biome lint, Vitest, build verification, Playwright Chromium integration tests |
 
-All profiles run the caller's `tests/` with Copier 9.14.1 and Python 3.14.7.
+All profiles run the caller's `tests/` with Copier 9.14.1 on a separate Python 3.14 bootstrap interpreter. Generated Python validation reads the exact version from the generated `.python-version` and passes it through sync, tests, build and isolated installation. uv is initialized once.
 The generated Python project must define its dev dependency group.
+The Python profile expects one console entry point and a template-repository `tests/smoke_installed.py` containing pytest tests. Those tests run outside the generated checkout, with `CLI_EXECUTABLE` pointing to the installed console script in the wheel-only environment (plus pytest). Assert actual outputs and state changes, not only exit status. The `copier-junit` artifact contains available contract, generated-project, installed-wheel, Vitest and Playwright reports. The job summary lists the outcome of each stage, including skipped stages; Python quality checks also list their individual outcomes. Reports cannot exist for tests that never ran.
+
 The Python profile expects one console entry point; the WinUI profile does
 not launch an interactive GUI. WinUI uses non-strict Twine because the current
 template deliberately omits a README. Chromium installs dependencies without
