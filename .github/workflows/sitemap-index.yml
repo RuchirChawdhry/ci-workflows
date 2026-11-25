@@ -91,21 +91,25 @@ jobs:
                   final, data = request(url)
               except HTTPError as error:
                   if error.code in {404, 410}:
+                      print(f"Sitemap unavailable ({error.code}): {url}")
                       return set()
                   raise
               if final != url or b"<!DOCTYPE" in data.upper():
+                  print(f"Sitemap redirected or contains a prohibited DOCTYPE: {url} -> {final}")
                   return set()
               try:
                   root = ET.fromstring(data)
               except ET.ParseError:
+                  print(f"Sitemap is not valid XML: {url}")
                   return set()
               if root.tag == tag("urlset"):
                   locations = [entry.findtext(tag("loc"), "").strip() for entry in root.findall(tag("url"))]
                   if not locations or not all(in_project(loc, base) for loc in locations):
-                    print(f"Sitemap contains no URLs or out-of-scope URLs: {url}")
-                    return set()
-                return {url}
+                      print(f"Sitemap contains no URLs or out-of-scope URLs: {url}")
+                      return set()
+                  return {url}
               if root.tag != tag("sitemapindex"):
+                  print(f"Unexpected XML root in {url}: {root.tag}")
                   return set()
               leaves = set()
               for entry in root.findall(tag("sitemap")):
