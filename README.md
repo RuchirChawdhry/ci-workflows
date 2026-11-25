@@ -26,6 +26,7 @@ Python workflows intentionally use **uv** throughout. This is an opinionated too
 
 | Area | Tools & capabilities |
 |---|---|
+| Copier | [Template rendering and validation](docs/copier-ci.md), Python CLI, FastAPI, WinUI and Chromium |
 | Python | [uv monorepo CI](docs/python-cli.md), Ruff, pytest, wheel builds, compatibility checks |
 | JavaScript / TypeScript | [Node.js CI](docs/node-ci.md), Electron, Svelte, npm/pnpm/Yarn, builds |
 | PowerShell | PSScriptAnalyzer, Pester, syntax validation |
