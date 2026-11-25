@@ -35,7 +35,8 @@ def test_optional_landing_preserves_markdown_mirror(tmp_path):
     site = tmp_path / "site"
     prepare(wiki, site, "https://example.github.io/demo/", "https://github.com/example/demo", "Example")
     homepage = (site / "src/content/docs/index.md").read_text()
-    assert "template: splash" in homepage
+    assert "template: splash" not in homepage
+    assert "## Highlights" in homepage
     assert '<ul class="project-highlights"' in homepage
     assert "<strong>Agent-ready</strong><span>Predictable interfaces.</span>" in homepage
     assert "## Documentation" in homepage

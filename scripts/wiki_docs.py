@@ -49,7 +49,7 @@ def landing_cards(body):
     for title, description in re.findall(r"(?m)^- \*\*(.+?)\*\*: (.+)$", match.group(1)):
         cards.append(f"<li><strong>{html.escape(title)}</strong><span>{html.escape(description)}</span></li>")
     grid = '<ul class="project-highlights" aria-label="Highlights">' + "".join(cards) + "</ul>\n\n"
-    return body[:match.start()] + grid + body[match.end():]
+    return body[:match.start()] + "## Highlights\n\n" + grid + body[match.end():]
 
 
 def prepare(wiki, site, origin, repo_url, description):
@@ -92,8 +92,7 @@ def prepare(wiki, site, origin, repo_url, description):
             {"tag": "link", "attrs": {"rel": "describedby", "href": origin + "llms.txt"}},
         ]
         landing = name == "Home" and settings.get("landing", False)
-        template = "template: splash\n" if landing else ""
-        document = f"---\ntitle: {json.dumps(title)}\n{template}head: {json.dumps(head)}\n---\n\n"
+        document = f"---\ntitle: {json.dumps(title)}\nhead: {json.dumps(head)}\n---\n\n"
         rendered = rewrite(body, paths, origin, False)
         if landing:
             rendered = landing_cards(rendered)
