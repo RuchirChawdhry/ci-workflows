@@ -1,0 +1,76 @@
+name: Publish GitHub wiki
+
+on:
+  workflow_call:
+    secrets:
+      WIKI_TOKEN:
+        description: Optional Git credential with write access to the calling repository's wiki
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: publish-wiki
+      cancel-in-progress: false
+    steps:
+      - name: Check out calling repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Sync Markdown pages
+        shell: bash
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN || github.token }}
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          test -s wiki/Home.md || { echo "::error::wiki/Home.md is required."; exit 1; }
+          shopt -s nullglob
+          pages=(wiki/*.md)
+          for page in "${pages[@]}"; do
+            if [[ -L wiki || -L "$page" || ! -f "$page" ]]; then
+              echo "::error::Wiki source pages must be regular files, not symlinks."
+              exit 1
+            fi
+          done
+
+          # Keep credentials out of the remote URL and on-disk Git config.
+          auth=$(printf 'x-access-token:%s' "$WIKI_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http."${GITHUB_SERVER_URL}/".extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
+          unset auth WIKI_TOKEN
+
+          destination="$RUNNER_TEMP/published-wiki"
+          if ! git clone "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.wiki.git" "$destination"; then
+            echo "::error::Initialize the wiki with a Home page in GitHub and verify wiki access."
+            exit 1
+          fi
+
+          # Copy only managed pages; never delete unrelated wiki content.
+          for page in "${pages[@]}"; do
+            name="${page##*/}"
+            cp --remove-destination -T -- "$page" "$destination/$name"
+            git -C "$destination" add -- "$name"
+          done
+          if git -C "$destination" diff --cached --quiet; then
+            echo "Wiki already up to date." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          git -C "$destination" -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Publish wiki from ${GITHUB_SHA}"
+          if ! git -C "$destination" push; then
+            echo "::error::Wiki push failed. Check wiki write access; configure WIKI_TOKEN if the job token is insufficient. Retry after resolving concurrent edits."
+            exit 1
+          fi
+          echo "Published wiki from ${GITHUB_SHA}." >> "$GITHUB_STEP_SUMMARY"
