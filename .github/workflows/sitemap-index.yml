@@ -1,0 +1,191 @@
+name: Publish portfolio sitemap
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    if: ${{ github.repository == format('{0}/{1}.github.io', github.repository_owner, github.repository_owner) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out root website
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Discover project sitemaps and build root website
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import html
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          from urllib.error import HTTPError
+          from urllib.parse import quote, urlsplit
+          from urllib.request import Request, urlopen
+          import xml.etree.ElementTree as ET
+          
+          NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
+          ET.register_namespace("", NS)
+          LIMIT = 52_428_800
+          
+          
+          def tag(name):
+              return f"{{{NS}}}{name}"
+          
+          
+          def request(url, headers=None):
+              with urlopen(Request(url, headers=headers or {}), timeout=20) as response:
+                  data = response.read(LIMIT + 1)
+                  if len(data) > LIMIT:
+                      raise ValueError(f"Response exceeds sitemap size limit: {url}")
+                  return response.geturl(), data
+          
+          
+          def repositories(owner, token):
+              headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+              page = 1
+              while True:
+                  _, data = request(
+                      f"https://api.github.com/users/{quote(owner)}/repos?type=owner&per_page=100&page={page}",
+                      headers,
+                  )
+                  repos = json.loads(data)
+                  yield from repos
+                  if len(repos) < 100:
+                      return
+                  page += 1
+          
+          
+          def in_project(url, base):
+              parsed = urlsplit(url)
+              scope = urlsplit(base)
+              return (
+                  parsed.scheme == "https"
+                  and parsed.netloc == scope.netloc
+                  and parsed.path.startswith(scope.path)
+                  and not parsed.query and not parsed.fragment
+                  and not any(part in {".", ".."} for part in parsed.path.split("/"))
+              )
+          
+          
+          def sitemap_leaves(url, base, seen=None):
+              seen = set() if seen is None else seen
+              if url in seen or not in_project(url, base):
+                  return set()
+              if len(seen) >= 100:
+                  raise ValueError(f"Too many sitemap references for {base}")
+              seen.add(url)
+              try:
+                  final, data = request(url)
+              except HTTPError as error:
+                  if error.code in {404, 410}:
+                      return set()
+                  raise
+              if final != url or b"<!DOCTYPE" in data.upper():
+                  return set()
+              try:
+                  root = ET.fromstring(data)
+              except ET.ParseError:
+                  return set()
+              if root.tag == tag("urlset"):
+                  locations = [entry.findtext(tag("loc"), "").strip() for entry in root.findall(tag("url"))]
+                  return {url} if locations and all(in_project(loc, base) for loc in locations) else set()
+              if root.tag != tag("sitemapindex"):
+                  return set()
+              leaves = set()
+              for entry in root.findall(tag("sitemap")):
+                  leaves.update(sitemap_leaves(entry.findtext(tag("loc"), "").strip(), base, seen))
+              return leaves
+          
+          
+          def discover(owner, repos):
+              host = f"https://{owner.lower()}.github.io/"
+              projects = []
+              for repo in sorted(repos, key=lambda item: item["name"].lower()):
+                  name = repo["name"]
+                  if repo.get("private") or not repo.get("has_pages") or name.lower() == f"{owner.lower()}.github.io":
+                      continue
+                  base = host + quote(name, safe="") + "/"
+                  leaves = sitemap_leaves(base + "sitemap-index.xml", base)
+                  if not leaves:
+                      leaves = sitemap_leaves(base + "sitemap.xml", base)
+                  if leaves:
+                      projects.append((name, base, sorted(leaves)))
+                      print(f"Discovered {name}: {len(leaves)} sitemap(s)")
+                  else:
+                      print(f"::notice::No eligible sitemap for {name}")
+              return projects
+          
+          
+          def write_xml(path, kind, item, urls):
+              root = ET.Element(tag(kind))
+              for url in sorted(set(urls)):
+                  ET.SubElement(ET.SubElement(root, tag(item)), tag("loc")).text = url
+              ET.indent(root)
+              ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+          
+          
+          def generate(owner, projects, output):
+              host = f"https://{owner.lower()}.github.io/"
+              output.mkdir(parents=True, exist_ok=True)
+              if Path("public").is_dir():
+                  shutil.copytree("public", output, dirs_exist_ok=True)
+              write_xml(output / "sitemap-root.xml", "urlset", "url", [host])
+              write_xml(output / "sitemap.xml", "sitemapindex", "sitemap",
+                        [host + "sitemap-root.xml", *(url for _, _, leaves in projects for url in leaves)])
+              (output / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {host}sitemap.xml\n", encoding="utf-8")
+              links = "\n".join(
+                  f'<li><a href="{html.escape(base, quote=True)}">{html.escape(name)}</a></li>'
+                  for name, base, _ in projects
+              )
+              (output / "index.html").write_text(
+                  f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+                  f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+                  f'<title>{html.escape(owner)} — Open-source project documentation</title>'
+                  f'<meta name="description" content="Directory of published open-source project documentation.">'
+                  f'<link rel="canonical" href="{host}"></head><body>'
+                  f'<main><h1>Open-source project documentation</h1><p>Published project websites by '
+                  f'<a href="https://github.com/{html.escape(owner, quote=True)}">{html.escape(owner)}</a>.</p>'
+                  f'<ul>{links}</ul><p><a href="/sitemap.xml">Sitemap</a></p></main></body></html>\n',
+                  encoding="utf-8",
+              )
+          
+          
+          if __name__ == "__main__":
+              owner = os.environ["GITHUB_REPOSITORY_OWNER"]
+              projects = discover(owner, repositories(owner, os.environ["GH_TOKEN"]))
+              generate(owner, projects, Path("dist"))
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  summary.write(f"## Sitemap index\n\nDiscovered {len(projects)} project site(s).\n")
+                  for name, _, leaves in projects:
+                      summary.write(f"- {name}: {len(leaves)} sitemap(s)\n")
+          PY
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish root website
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
