@@ -299,15 +299,18 @@ def inject(path, graph):
 
 
 def wiki_site(dist, origin, repo, owner, metadata, config):
+    from wiki_docs import site_settings
+
     wiki = repo / "wiki"
     sources = sorted(p for p in wiki.glob("*.md") if not p.name.startswith("_"))
     titles = {p.stem: p.read_text(encoding="utf-8").splitlines()[0].removeprefix("# ") for p in sources}
     if set(config.get("pageTypes", {})) - (set(titles) - {"Home"}):
         raise ValueError("pageTypes contains an unknown or homepage source")
+    site_title = site_settings(wiki).get("title", titles["Home"])
     for path in sources:
         route = "" if path.stem == "Home" else path.stem.lower() + "/"
         url = origin + route
-        graph = project_graph(origin, titles["Home"], titles[path.stem], url, owner, metadata, config,
+        graph = project_graph(origin, site_title, titles[path.stem], url, owner, metadata, config,
                               modified(path, repo), config.get("pageTypes", {}).get(path.stem, "TechArticle"))
         inject(dist / route / "index.html", graph)
     print(f"Validated JSON-LD on {len(sources)} documentation pages")

@@ -17,3 +17,7 @@ jobs:
 Set repository Settings → Pages → Source to GitHub Actions before deployment. Grant contents: read, pages: write, id-token: write in the caller. The workflow assumes the default github.io project URL; custom domains and nested wiki assets are outside this initial implementation. The llms.txt format is a proposal for documentation consumption, not an indexing guarantee.
 
 See [structured data generation and overrides](structured-data.md) for the shared JSON-LD implementation.
+
+## Optional landing page
+
+Place `_Site.json` in `wiki/` with `{"title":"repository-name","landing":true}` to use a Starlight splash homepage. In Home.md, write an H1, introductory text, a fenced quick-start command, and a `## Highlights` section containing consecutive `- **Title**: Description` lines. The generator renders that list as responsive feature cards on the website while keeping the wiki and Markdown mirrors as ordinary Markdown. Retain documentation and source links in Home.md. Other pages remain unchanged.

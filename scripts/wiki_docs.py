@@ -1,5 +1,6 @@
 """Build a Starlight documentation site and agent-readable files from wiki Markdown."""
 import argparse
+import html
 import json
 from pathlib import Path
 import re
@@ -33,8 +34,27 @@ def rewrite(text, paths, origin, markdown):
     return "\n".join(lines).strip() + "\n"
 
 
+def site_settings(wiki):
+    path = wiki / "_Site.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
+def landing_cards(body):
+    """Render the authored Highlights list as cards, leaving Markdown mirrors unchanged."""
+    pattern = r"(?m)^## Highlights[ \t]*\n\n((?:- \*\*[^\n]+\*\*: [^\n]+\n?)+)"
+    match = re.search(pattern, body)
+    if not match:
+        raise ValueError("Landing page requires a Highlights list of '**Title**: Description' entries")
+    cards = []
+    for title, description in re.findall(r"(?m)^- \*\*(.+?)\*\*: (.+)$", match.group(1)):
+        cards.append(f"<li><strong>{html.escape(title)}</strong><span>{html.escape(description)}</span></li>")
+    grid = '<ul class="project-highlights" aria-label="Highlights">' + "".join(cards) + "</ul>\n\n"
+    return body[:match.start()] + grid + body[match.end():]
+
+
 def prepare(wiki, site, origin, repo_url, description):
     origin = origin.rstrip("/") + "/"
+    settings = site_settings(wiki)
     files = {p.stem: p for p in sorted(wiki.glob("*.md")) if not p.name.startswith("_")}
     if "Home" not in files:
         raise ValueError("wiki/Home.md is required")
@@ -71,15 +91,20 @@ def prepare(wiki, site, origin, repo_url, description):
             {"tag": "link", "attrs": {"rel": "alternate", "type": "text/markdown", "href": origin + route + "index.md"}},
             {"tag": "link", "attrs": {"rel": "describedby", "href": origin + "llms.txt"}},
         ]
-        document = f"---\ntitle: {json.dumps(title)}\nhead: {json.dumps(head)}\n---\n\n"
+        landing = name == "Home" and settings.get("landing", False)
+        template = "template: splash\n" if landing else ""
+        document = f"---\ntitle: {json.dumps(title)}\n{template}head: {json.dumps(head)}\n---\n\n"
+        rendered = rewrite(body, paths, origin, False)
+        if landing:
+            rendered = landing_cards(rendered)
         (content / ("index.md" if not route else route.rstrip("/") + ".md")).write_text(
-            document + rewrite(body, paths, origin, False), encoding="utf-8")
+            document + rendered, encoding="utf-8")
     title = files["Home"].read_text(encoding="utf-8").splitlines()[0][2:].strip()
     summary = " ".join(description.split())
     index = f"# {title}\n\n> {summary}\n\nSource: {repo_url}\n\n## Documentation\n\n"
     (public / "llms.txt").write_text(index + "\n".join(entries) + f"\n\n## Complete documentation\n\n- [All pages]({origin}llms-full.txt)\n", encoding="utf-8")
     (public / "llms-full.txt").write_text("\n\n---\n\n".join(full), encoding="utf-8")
-    (site / "docs-meta.json").write_text(json.dumps({"title": title, "description": summary, "repo": repo_url, "sidebar": navigation}), encoding="utf-8")
+    (site / "docs-meta.json").write_text(json.dumps({"title": settings.get("title", title), "description": summary, "repo": repo_url, "sidebar": navigation}), encoding="utf-8")
     print(f"Prepared {len(files)} wiki pages and Markdown mirrors")
 
 
