@@ -17,7 +17,6 @@ jobs:
     timeout-minutes: 25
     env:
       COPIER_PYTHON: '3.14'
-      REPORT_DIR: ${{ runner.temp }}/copier-reports
     defaults:
       run:
         shell: bash
@@ -44,7 +43,10 @@ jobs:
           enable-cache: false
       - name: Test template contracts
         id: test_template_contracts
+        env:
+          REPORT_DIR: ${{ runner.temp }}/copier-reports
         run: |
+          echo "REPORT_DIR=$REPORT_DIR" >> "$GITHUB_ENV"
           mkdir -p "$REPORT_DIR"
           uv run --no-project --python "$COPIER_PYTHON" --with copier==9.14.1 --with pytest --with PyYAML pytest -q tests --junitxml="$REPORT_DIR/template.xml"
       - name: Render current template
@@ -84,14 +86,13 @@ jobs:
           test "${#sdists[@]}" -eq 1
           # WinUI intentionally has no README yet; twine warns about that.
           if [[ "$PROFILE" == winui ]]; then
-            uvx twine check "${wheels[0]}" "${sdists[0]}"
+            uvx --python "$PYTHON_VERSION" twine check "${wheels[0]}" "${sdists[0]}"
           else
-            uvx twine check --strict "${wheels[0]}" "${sdists[0]}"
+            uvx --python "$PYTHON_VERSION" twine check --strict "${wheels[0]}" "${sdists[0]}"
           fi
       - name: Resolve generated console script
         id: resolve_generated_console_script
         if: inputs.profile == 'python'
-        id: console
         working-directory: .ci-generated
         run: |
           uv run --no-sync python -c 'import tomllib; from pathlib import Path; scripts = tomllib.loads(Path("pyproject.toml").read_text())["project"]["scripts"]; assert len(scripts) == 1; print("command=" + next(iter(scripts)))' >> "$GITHUB_OUTPUT"
@@ -100,7 +101,7 @@ jobs:
         if: inputs.profile == 'python'
         uses: $/actions/test-python-cli
         with:
-          cli-command: ${{ steps.console.outputs.command }}
+          cli-command: ${{ steps.resolve_generated_console_script.outputs.command }}
           dist-dir: ${{ runner.temp }}/copier-dist
           python-version: ${{ steps.python_version.outputs.version }}
           smoke-test: tests/smoke_installed.py
