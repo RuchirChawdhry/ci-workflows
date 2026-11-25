@@ -1,0 +1,124 @@
+name: Copier template CI
+
+on:
+  workflow_call:
+    inputs:
+      profile:
+        description: "python (CLI or service), winui, or chromium"
+        type: string
+        default: python
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ${{ inputs.profile == 'winui' && 'windows-latest' || 'ubuntu-24.04' }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out calling template
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate profile
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$PROFILE" in
+            python|winui|chromium) ;;
+            *) echo "Unknown Copier profile: $PROFILE" >&2; exit 1 ;;
+          esac
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
+      - name: Test template contracts
+        run: uv run --no-project --python 3.14.7 --with copier==9.14.1 --with pytest --with PyYAML pytest -q tests
+      - name: Render current template
+        run: uv run --no-project --python 3.14.7 --with copier==9.14.1 copier copy --defaults --vcs-ref=HEAD . .ci-generated
+      - name: Check generated Python project
+        if: inputs.profile != 'chromium'
+        uses: $/actions/python-checks
+        with:
+          project-path: .ci-generated
+      - name: Build Python distributions
+        if: inputs.profile != 'chromium'
+        working-directory: .ci-generated
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          uv build --sdist --wheel --out-dir "$RUNNER_TEMP/copier-dist"
+          shopt -s nullglob
+          wheels=("$RUNNER_TEMP/copier-dist/"*.whl)
+          sdists=("$RUNNER_TEMP/copier-dist/"*.tar.gz)
+          test "${#wheels[@]}" -eq 1
+          test "${#sdists[@]}" -eq 1
+          # WinUI intentionally has no README yet; twine warns about that.
+          if [[ "$PROFILE" == winui ]]; then
+            uvx twine check "${wheels[0]}" "${sdists[0]}"
+          else
+            uvx twine check --strict "${wheels[0]}" "${sdists[0]}"
+          fi
+      - name: Resolve generated console script
+        if: inputs.profile == 'python'
+        id: console
+        working-directory: .ci-generated
+        run: |
+          uv run --no-sync python -c 'import tomllib; from pathlib import Path; scripts = tomllib.loads(Path("pyproject.toml").read_text())["project"]["scripts"]; assert len(scripts) == 1; print("command=" + next(iter(scripts)))' >> "$GITHUB_OUTPUT"
+      - name: Smoke test installed CLI
+        if: inputs.profile == 'python'
+        uses: $/actions/test-python-cli
+        with:
+          cli-command: ${{ steps.console.outputs.command }}
+          dist-dir: ${{ runner.temp }}/copier-dist
+      - name: Install and verify WinUI wheel
+        if: inputs.profile == 'winui'
+        run: |
+          set -euo pipefail
+          uv venv --python 3.14.7 "$RUNNER_TEMP/copier-winui"
+          python="$RUNNER_TEMP/copier-winui/Scripts/python.exe"
+          uv pip install --python "$python" "$RUNNER_TEMP"/copier-dist/*.whl
+          "$python" -c 'import importlib.metadata as m; import tomllib; from pathlib import Path; project = tomllib.loads(Path(".ci-generated/pyproject.toml").read_text())["project"]; entries = {e.name: e.value for e in m.distribution(project["name"]).entry_points if e.group == "gui_scripts"}; assert entries == project["gui-scripts"]'
+      - name: Set up Node.js
+        if: inputs.profile == 'chromium'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install Chromium project dependencies
+        if: inputs.profile == 'chromium'
+        working-directory: .ci-generated
+        run: |
+          set -euo pipefail
+          npm install --global corepack@0.34.5
+          corepack enable pnpm
+          pnpm install --no-frozen-lockfile
+      - name: Typecheck Chromium project
+        if: inputs.profile == 'chromium'
+        working-directory: .ci-generated
+        run: pnpm typecheck
+      - name: Lint Chromium project
+        if: inputs.profile == 'chromium'
+        working-directory: .ci-generated
+        run: pnpm lint
+      - name: Test Chromium project
+        if: inputs.profile == 'chromium'
+        working-directory: .ci-generated
+        run: pnpm test
+      - name: Build and verify Chromium project
+        if: inputs.profile == 'chromium'
+        working-directory: .ci-generated
+        run: |
+          pnpm build
+          pnpm verify:build
+      - name: Browser integration tests
+        if: inputs.profile == 'chromium'
+        working-directory: .ci-generated
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          xvfb-run -a pnpm test:e2e
