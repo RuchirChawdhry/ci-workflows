@@ -2,6 +2,10 @@ name: Python CLI quality checks
 description: Opinionated uv-only Python CLI setup, lint, formatting, tests, and optional help smoke test.
 
 inputs:
+  setup-uv:
+    description: Install uv; set false when the caller already initialized it
+    required: false
+    default: 'true'
   python-version:
     description: Python version to test
     required: false
@@ -31,10 +35,13 @@ runs:
   using: composite
   steps:
     - name: Set up uv
+      id: set_up_uv
+      if: inputs.setup-uv == 'true'
       uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       with:
         version: latest-known
     - name: Install Python and project dependencies
+      id: install_python_and_project_dependencies
       shell: bash
       working-directory: ${{ inputs.project-path }}
       env:
@@ -59,18 +66,22 @@ runs:
         if [[ -n "$WORKSPACE_PACKAGE" ]]; then sync_args+=(--package "$WORKSPACE_PACKAGE"); fi
         uv sync "${sync_args[@]}"
     - name: Verify Python
+      id: verify_python
       shell: bash
       working-directory: ${{ inputs.project-path }}
       run: uv run --no-sync python --version
     - name: Lint
+      id: lint
       shell: bash
       working-directory: ${{ inputs.project-path }}
       run: uv run --no-sync ruff check .
     - name: Check formatting
+      id: check_formatting
       shell: bash
       working-directory: ${{ inputs.project-path }}
       run: uv run --no-sync ruff format --check .
     - name: Test
+      id: test
       if: ${{ inputs.test-command != '' }}
       shell: bash
       working-directory: ${{ inputs.project-path }}
@@ -80,9 +91,36 @@ runs:
         set -euo pipefail
         uv run --no-sync bash -e -o pipefail -c "$TEST_COMMAND"
     - name: CLI help smoke test
+      id: cli_help_smoke_test
       if: ${{ inputs.cli-command != '' }}
       shell: bash
       working-directory: ${{ inputs.project-path }}
       env:
         CLI_COMMAND: ${{ inputs.cli-command }}
       run: uv run --no-sync "$CLI_COMMAND" --help
+    - name: Summarize Python quality checks
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      env:
+        STAGE_SET_UP_UV: ${{ steps.set_up_uv.outcome }}
+        STAGE_INSTALL_PYTHON_AND_PROJECT_DEPENDENCIES: ${{ steps.install_python_and_project_dependencies.outcome }}
+        STAGE_VERIFY_PYTHON: ${{ steps.verify_python.outcome }}
+        STAGE_LINT: ${{ steps.lint.outcome }}
+        STAGE_CHECK_FORMATTING: ${{ steps.check_formatting.outcome }}
+        STAGE_TEST: ${{ steps.test.outcome }}
+        STAGE_CLI_HELP_SMOKE_TEST: ${{ steps.cli_help_smoke_test.outcome }}
+      run: |
+        {
+          echo '### Python quality checks'
+          echo
+          echo '| Stage | Outcome |'
+          echo '| --- | --- |'
+          printf '| Set up uv | %s |\n' "$STAGE_SET_UP_UV"
+          printf '| Install Python and project dependencies | %s |\n' "$STAGE_INSTALL_PYTHON_AND_PROJECT_DEPENDENCIES"
+          printf '| Verify Python | %s |\n' "$STAGE_VERIFY_PYTHON"
+          printf '| Lint | %s |\n' "$STAGE_LINT"
+          printf '| Check formatting | %s |\n' "$STAGE_CHECK_FORMATTING"
+          printf '| Test | %s |\n' "$STAGE_TEST"
+          printf '| CLI help smoke test | %s |\n' "$STAGE_CLI_HELP_SMOKE_TEST"
+        } >> "$GITHUB_STEP_SUMMARY"

@@ -15,15 +15,19 @@ jobs:
   validate:
     runs-on: ${{ inputs.profile == 'winui' && 'windows-latest' || 'ubuntu-24.04' }}
     timeout-minutes: 25
+    env:
+      COPIER_PYTHON: '3.14'
     defaults:
       run:
         shell: bash
     steps:
       - name: Check out calling template
+        id: check_out_calling_template
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Validate profile
+        id: validate_profile
         env:
           PROFILE: ${{ inputs.profile }}
         run: |
@@ -32,27 +36,49 @@ jobs:
             *) echo "Unknown Copier profile: $PROFILE" >&2; exit 1 ;;
           esac
       - name: Set up uv
+        id: set_up_uv
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: latest-known
           enable-cache: false
       - name: Test template contracts
-        run: uv run --no-project --python 3.14.7 --with copier==9.14.1 --with pytest --with PyYAML pytest -q tests
+        id: test_template_contracts
+        env:
+          REPORT_DIR: ${{ runner.temp }}/copier-reports
+        run: |
+          echo "REPORT_DIR=$REPORT_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$REPORT_DIR"
+          uv run --no-project --python "$COPIER_PYTHON" --with copier==9.14.1 --with pytest --with PyYAML pytest -q tests --junitxml="$REPORT_DIR/template.xml"
       - name: Render current template
-        run: uv run --no-project --python 3.14.7 --with copier==9.14.1 copier copy --defaults --vcs-ref=HEAD . .ci-generated
+        id: render_current_template
+        run: uv run --no-project --python "$COPIER_PYTHON" --with copier==9.14.1 copier copy --defaults --vcs-ref=HEAD . .ci-generated
+      - name: Read generated Python version
+        id: python_version
+        if: inputs.profile != 'chromium'
+        working-directory: .ci-generated
+        run: |
+          version="$(tr -d '\r\n' < .python-version)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected an exact Python version in .python-version' >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Check generated Python project
+        id: check_generated_python_project
         if: inputs.profile != 'chromium'
         uses: $/actions/python-checks
         with:
           project-path: .ci-generated
+          python-version: ${{ steps.python_version.outputs.version }}
+          setup-uv: 'false'
+          test-command: pytest -q --junitxml="$REPORT_DIR/generated-python.xml"
       - name: Build Python distributions
+        id: build_python_distributions
         if: inputs.profile != 'chromium'
         working-directory: .ci-generated
         env:
           PROFILE: ${{ inputs.profile }}
+          PYTHON_VERSION: ${{ steps.python_version.outputs.version }}
         run: |
           set -euo pipefail
-          uv build --sdist --wheel --out-dir "$RUNNER_TEMP/copier-dist"
+          uv build --python "$PYTHON_VERSION" --sdist --wheel --out-dir "$RUNNER_TEMP/copier-dist"
           shopt -s nullglob
           wheels=("$RUNNER_TEMP/copier-dist/"*.whl)
           sdists=("$RUNNER_TEMP/copier-dist/"*.tar.gz)
@@ -60,37 +86,46 @@ jobs:
           test "${#sdists[@]}" -eq 1
           # WinUI intentionally has no README yet; twine warns about that.
           if [[ "$PROFILE" == winui ]]; then
-            uvx twine check "${wheels[0]}" "${sdists[0]}"
+            uvx --python "$PYTHON_VERSION" twine check "${wheels[0]}" "${sdists[0]}"
           else
-            uvx twine check --strict "${wheels[0]}" "${sdists[0]}"
+            uvx --python "$PYTHON_VERSION" twine check --strict "${wheels[0]}" "${sdists[0]}"
           fi
       - name: Resolve generated console script
+        id: resolve_generated_console_script
         if: inputs.profile == 'python'
-        id: console
         working-directory: .ci-generated
         run: |
           uv run --no-sync python -c 'import tomllib; from pathlib import Path; scripts = tomllib.loads(Path("pyproject.toml").read_text())["project"]["scripts"]; assert len(scripts) == 1; print("command=" + next(iter(scripts)))' >> "$GITHUB_OUTPUT"
       - name: Smoke test installed CLI
+        id: smoke_test_installed_cli
         if: inputs.profile == 'python'
         uses: $/actions/test-python-cli
         with:
-          cli-command: ${{ steps.console.outputs.command }}
+          cli-command: ${{ steps.resolve_generated_console_script.outputs.command }}
           dist-dir: ${{ runner.temp }}/copier-dist
+          python-version: ${{ steps.python_version.outputs.version }}
+          smoke-test: tests/smoke_installed.py
+          junit-path: ${{ runner.temp }}/copier-reports/installed-wheel.xml
       - name: Install and verify WinUI wheel
+        id: install_and_verify_winui_wheel
         if: inputs.profile == 'winui'
+        env:
+          PYTHON_VERSION: ${{ steps.python_version.outputs.version }}
         run: |
           set -euo pipefail
-          uv venv --python 3.14.7 "$RUNNER_TEMP/copier-winui"
+          uv venv --python "$PYTHON_VERSION" "$RUNNER_TEMP/copier-winui"
           python="$RUNNER_TEMP/copier-winui/Scripts/python.exe"
           uv pip install --python "$python" "$RUNNER_TEMP"/copier-dist/*.whl
           "$python" -c 'import importlib.metadata as m; import tomllib; from pathlib import Path; project = tomllib.loads(Path(".ci-generated/pyproject.toml").read_text())["project"]; entries = {e.name: e.value for e in m.distribution(project["name"]).entry_points if e.group == "gui_scripts"}; assert entries == project["gui-scripts"]'
       - name: Set up Node.js
+        id: set_up_node_js
         if: inputs.profile == 'chromium'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           package-manager-cache: false
       - name: Install Chromium project dependencies
+        id: install_chromium_project_dependencies
         if: inputs.profile == 'chromium'
         working-directory: .ci-generated
         run: |
@@ -99,26 +134,90 @@ jobs:
           corepack enable pnpm
           pnpm install --no-frozen-lockfile
       - name: Typecheck Chromium project
+        id: typecheck_chromium_project
         if: inputs.profile == 'chromium'
         working-directory: .ci-generated
         run: pnpm typecheck
       - name: Lint Chromium project
+        id: lint_chromium_project
         if: inputs.profile == 'chromium'
         working-directory: .ci-generated
         run: pnpm lint
       - name: Test Chromium project
+        id: test_chromium_project
         if: inputs.profile == 'chromium'
         working-directory: .ci-generated
-        run: pnpm test
+        run: pnpm test --reporter=default --reporter=junit --outputFile.junit="$REPORT_DIR/chromium-unit.xml"
       - name: Build and verify Chromium project
+        id: build_and_verify_chromium_project
         if: inputs.profile == 'chromium'
         working-directory: .ci-generated
         run: |
           pnpm build
           pnpm verify:build
       - name: Browser integration tests
+        id: browser_integration_tests
         if: inputs.profile == 'chromium'
         working-directory: .ci-generated
         run: |
           pnpm exec playwright install --with-deps chromium
-          xvfb-run -a pnpm test:e2e
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE="$REPORT_DIR/chromium-browser.xml" xvfb-run -a pnpm exec playwright test --reporter=list,junit
+      - name: Upload JUnit reports
+        id: reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: copier-junit
+          path: ${{ runner.temp }}/copier-reports/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Summarize validation stages
+        if: always()
+        env:
+          STAGE_CHECK_OUT_CALLING_TEMPLATE: ${{ steps.check_out_calling_template.outcome }}
+          STAGE_VALIDATE_PROFILE: ${{ steps.validate_profile.outcome }}
+          STAGE_SET_UP_UV: ${{ steps.set_up_uv.outcome }}
+          STAGE_TEST_TEMPLATE_CONTRACTS: ${{ steps.test_template_contracts.outcome }}
+          STAGE_RENDER_CURRENT_TEMPLATE: ${{ steps.render_current_template.outcome }}
+          STAGE_PYTHON_VERSION: ${{ steps.python_version.outcome }}
+          STAGE_CHECK_GENERATED_PYTHON_PROJECT: ${{ steps.check_generated_python_project.outcome }}
+          STAGE_BUILD_PYTHON_DISTRIBUTIONS: ${{ steps.build_python_distributions.outcome }}
+          STAGE_RESOLVE_GENERATED_CONSOLE_SCRIPT: ${{ steps.resolve_generated_console_script.outcome }}
+          STAGE_SMOKE_TEST_INSTALLED_CLI: ${{ steps.smoke_test_installed_cli.outcome }}
+          STAGE_INSTALL_AND_VERIFY_WINUI_WHEEL: ${{ steps.install_and_verify_winui_wheel.outcome }}
+          STAGE_SET_UP_NODE_JS: ${{ steps.set_up_node_js.outcome }}
+          STAGE_INSTALL_CHROMIUM_PROJECT_DEPENDENCIES: ${{ steps.install_chromium_project_dependencies.outcome }}
+          STAGE_TYPECHECK_CHROMIUM_PROJECT: ${{ steps.typecheck_chromium_project.outcome }}
+          STAGE_LINT_CHROMIUM_PROJECT: ${{ steps.lint_chromium_project.outcome }}
+          STAGE_TEST_CHROMIUM_PROJECT: ${{ steps.test_chromium_project.outcome }}
+          STAGE_BUILD_AND_VERIFY_CHROMIUM_PROJECT: ${{ steps.build_and_verify_chromium_project.outcome }}
+          STAGE_BROWSER_INTEGRATION_TESTS: ${{ steps.browser_integration_tests.outcome }}
+          STAGE_REPORTS: ${{ steps.reports.outcome }}
+        run: |
+          {
+            echo '## Copier validation'
+            echo
+            echo '| Stage | Outcome |'
+            echo '| --- | --- |'
+            printf '| Check out calling template | %s |\n' "$STAGE_CHECK_OUT_CALLING_TEMPLATE"
+            printf '| Validate profile | %s |\n' "$STAGE_VALIDATE_PROFILE"
+            printf '| Set up uv | %s |\n' "$STAGE_SET_UP_UV"
+            printf '| Test template contracts | %s |\n' "$STAGE_TEST_TEMPLATE_CONTRACTS"
+            printf '| Render current template | %s |\n' "$STAGE_RENDER_CURRENT_TEMPLATE"
+            printf '| Read generated Python version | %s |\n' "$STAGE_PYTHON_VERSION"
+            printf '| Check generated Python project | %s |\n' "$STAGE_CHECK_GENERATED_PYTHON_PROJECT"
+            printf '| Build Python distributions | %s |\n' "$STAGE_BUILD_PYTHON_DISTRIBUTIONS"
+            printf '| Resolve generated console script | %s |\n' "$STAGE_RESOLVE_GENERATED_CONSOLE_SCRIPT"
+            printf '| Smoke test installed CLI | %s |\n' "$STAGE_SMOKE_TEST_INSTALLED_CLI"
+            printf '| Install and verify WinUI wheel | %s |\n' "$STAGE_INSTALL_AND_VERIFY_WINUI_WHEEL"
+            printf '| Set up Node.js | %s |\n' "$STAGE_SET_UP_NODE_JS"
+            printf '| Install Chromium project dependencies | %s |\n' "$STAGE_INSTALL_CHROMIUM_PROJECT_DEPENDENCIES"
+            printf '| Typecheck Chromium project | %s |\n' "$STAGE_TYPECHECK_CHROMIUM_PROJECT"
+            printf '| Lint Chromium project | %s |\n' "$STAGE_LINT_CHROMIUM_PROJECT"
+            printf '| Test Chromium project | %s |\n' "$STAGE_TEST_CHROMIUM_PROJECT"
+            printf '| Build and verify Chromium project | %s |\n' "$STAGE_BUILD_AND_VERIFY_CHROMIUM_PROJECT"
+            printf '| Browser integration tests | %s |\n' "$STAGE_BROWSER_INTEGRATION_TESTS"
+            printf '| Upload JUnit reports | %s |\n' "$STAGE_REPORTS"
+            echo
+            echo 'JUnit XML: copier-junit artifact (when tests produced reports).'
+          } >> "$GITHUB_STEP_SUMMARY"
