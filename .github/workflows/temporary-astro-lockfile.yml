@@ -1,0 +1,24 @@
+name: Generate Astro security lockfile
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  lockfile:
+    if: github.head_ref == 'fix/astro-security-7.4.7'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: npm install --save-dev --save-exact astro@7.4.7 --package-lock-only --ignore-scripts
+      - name: Print generated patch
+        run: git diff -- package.json package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --json
