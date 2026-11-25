@@ -118,14 +118,19 @@ jobs:
               return leaves
           
           
-          def discover(owner, repos):
+          def eligible_projects(owner, repos):
               host = f"https://{owner.lower()}.github.io/"
-              projects = []
               for repo in sorted(repos, key=lambda item: item["name"].lower()):
                   name = repo["name"]
                   if repo.get("private") or not repo.get("has_pages") or name.lower() == f"{owner.lower()}.github.io":
                       continue
-                  base = host + quote(name, safe="") + "/"
+                  yield repo, host + quote(name, safe="") + "/"
+          
+          
+          def discover(owner, repos):
+              projects = []
+              for repo, base in eligible_projects(owner, repos):
+                  name = repo["name"]
                   leaves = sitemap_leaves(base + "sitemap-index.xml", base)
                   if not leaves:
                       leaves = sitemap_leaves(base + "sitemap.xml", base)
@@ -135,6 +140,57 @@ jobs:
                   else:
                       print(f"::notice::No eligible sitemap for {name}")
               return projects
+          
+          
+          def discover_llms(owner, repos):
+              projects = []
+              for repo, base in eligible_projects(owner, repos):
+                  url = base + "llms.txt"
+                  try:
+                      final, data = request(url)
+                  except HTTPError as error:
+                      if error.code in {404, 410}:
+                          continue
+                      raise
+                  if final != url:
+                      print(f"Skipping redirected llms.txt: {url} -> {final}")
+                      continue
+                  try:
+                      content = data.decode("utf-8-sig").strip()
+                  except UnicodeDecodeError:
+                      print(f"Skipping non-UTF-8 llms.txt: {url}")
+                      continue
+                  heading = content.splitlines()[0] if content else ""
+                  if not heading.startswith("# ") or not heading[2:].strip():
+                      print(f"Skipping llms.txt without a Markdown H1: {url}")
+                      continue
+                  description = " ".join((repo.get("description") or "").split())
+                  projects.append((repo["name"], url, description))
+                  print(f"Discovered llms.txt: {url}")
+              return projects
+          
+          
+          def write_llms(path, owner, projects):
+              host = f"https://{owner.lower()}.github.io/"
+              lines = [
+                  f"# {owner} — Open-source project documentation",
+                  "",
+                  "> Index of AI-readable documentation for public software projects.",
+                  "",
+                  "Use the project-specific documentation index to select relevant Markdown pages. "
+                  "Consult the project repository for source code and licensing.",
+                  "",
+                  "## Projects",
+                  "",
+              ]
+              for name, url, description in projects:
+                  description = html.escape(description, quote=False)
+                  for character in "\\*_[\x60]":
+                      description = description.replace(character, "\\" + character)
+                  lines.append(f"- [{name}]({url})" + (f": {description}" if description else ""))
+              lines.extend(["", "## Optional", "", f"- [Project directory]({host})", ""])
+              path.write_text("\n".join(lines), encoding="utf-8")
+              print(f"Generated llms.txt: {len(projects)} project documentation indexes")
           
           
           def write_xml(path, kind, item, urls):
@@ -250,7 +306,7 @@ jobs:
               print(f"Generated robots.txt: {sum(map(len, groups.values()))} named crawler tokens and wildcard; {len(leaves) + 2} sitemap declarations")
           
           
-          def generate(owner, projects, output):
+          def generate(owner, projects, output, llms_projects=()):
               host = f"https://{owner.lower()}.github.io/"
               output.mkdir(parents=True, exist_ok=True)
               if Path("public").is_dir():
@@ -262,6 +318,7 @@ jobs:
               write_xml(output / "sitemap.xml", "urlset", "url", pages)
               write_xml(output / "sitemaps.xml", "sitemapindex", "sitemap", [host + "sitemap.xml", *leaves])
               write_robots(output / "robots.txt", host, leaves)
+              write_llms(output / "llms.txt", owner, llms_projects)
               links = "\n".join(
                   f'<li><a href="{html.escape(base, quote=True)}">{html.escape(name)}</a></li>'
                   for name, base, _ in projects
@@ -271,10 +328,11 @@ jobs:
                   f'<meta name="viewport" content="width=device-width, initial-scale=1">'
                   f'<title>{html.escape(owner)} — Open-source project documentation</title>'
                   f'<meta name="description" content="Directory of published open-source project documentation.">'
-                  f'<link rel="canonical" href="{host}"></head><body>'
+                  f'<link rel="canonical" href="{host}">'
+                  f'<link rel="describedby" href="{host}llms.txt"></head><body>'
                   f'<main><h1>Open-source project documentation</h1><p>Published project websites by '
                   f'<a href="https://github.com/{html.escape(owner, quote=True)}">{html.escape(owner)}</a>.</p>'
-                  f'<ul>{links}</ul><p><a href="/sitemap.xml">All page URLs</a> · <a href="/sitemaps.xml">Sitemap index</a></p></main></body></html>\n',
+                  f'<ul>{links}</ul><p><a href="/sitemap.xml">All page URLs</a> · <a href="/sitemaps.xml">Sitemap index</a> · <a href="/llms.txt">AI documentation index</a></p></main></body></html>\n',
                   encoding="utf-8",
               )
               print(f"Generated sitemap.xml: {len(pages)} unique page URLs; sitemaps.xml: {len(leaves) + 1} sitemap files")
@@ -283,10 +341,12 @@ jobs:
           
           if __name__ == "__main__":
               owner = os.environ["GITHUB_REPOSITORY_OWNER"]
-              projects = discover(owner, repositories(owner, os.environ["GH_TOKEN"]))
-              page_count, sitemap_count = generate(owner, projects, Path("dist"))
+              repos = list(repositories(owner, os.environ["GH_TOKEN"]))
+              projects = discover(owner, repos)
+              llms_projects = discover_llms(owner, repos)
+              page_count, sitemap_count = generate(owner, projects, Path("dist"), llms_projects)
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-                  summary.write(f"## Sitemap index\n\nDiscovered {len(projects)} project site(s).\n\n- sitemap.xml: {page_count} unique page URLs\n- sitemaps.xml: {sitemap_count} sitemap files\n")
+                  summary.write(f"## Sitemap index\n\nDiscovered {len(projects)} project site(s).\n\n- sitemap.xml: {page_count} unique page URLs\n- sitemaps.xml: {sitemap_count} sitemap files\n- llms.txt: {len(llms_projects)} project documentation indexes\n")
                   for name, _, leaves in projects:
                       summary.write(f"- {name}: {len(leaves)} sitemap(s)\n")
           PY

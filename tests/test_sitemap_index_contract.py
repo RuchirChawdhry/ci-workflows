@@ -93,3 +93,53 @@ def test_robots_explicitly_allows_crawlers_and_lists_all_sitemaps(tmp_path):
     for agent in [*agents, "UnlistedResearchBot"]:
         assert parser.can_fetch(agent, host + "demo/docs/")
     assert parser.site_maps() == [host + "sitemaps.xml", host + "sitemap.xml", *sorted(leaves)]
+
+
+
+def test_domain_llms_discovery_independent_of_sitemaps(tmp_path):
+    _, ns = load()
+    host = "https://example.github.io/"
+    entries = [
+        {"name": "zeta", "has_pages": True, "description": "Line one\nLine two"},
+        {"name": "alpha", "has_pages": True, "description": "CLI *tool*"},
+        {"name": "absent", "has_pages": True},
+        {"name": "html", "has_pages": True},
+        {"name": "redirect", "has_pages": True},
+        {"name": "private", "has_pages": True, "private": True},
+        {"name": "disabled", "has_pages": False},
+        {"name": "example.github.io", "has_pages": True},
+    ]
+    responses = {
+        "alpha": ("alpha", b"# Alpha\n\n> Docs\n"),
+        "zeta": ("zeta", b"# Zeta\n"),
+        "html": ("html", b"<!DOCTYPE html><h1>Not found</h1>"),
+        "redirect": ("alpha", b"# Alpha\n"),
+    }
+    requested = []
+
+    def fake_request(url):
+        requested.append(url)
+        name = url.removeprefix(host).split("/")[0]
+        if name == "absent":
+            raise ns["HTTPError"](url, 404, "Not found", None, None)
+        final, data = responses[name]
+        return host + final + "/llms.txt", data
+
+    ns["request"] = fake_request
+    projects = ns["discover_llms"]("Example", entries)
+    assert [name for name, _, _ in projects] == ["alpha", "zeta"]
+    assert requested == [host + name + "/llms.txt" for name in ("absent", "alpha", "html", "redirect", "zeta")]
+    ns["generate"]("Example", [], tmp_path, projects)
+    llms = (tmp_path / "llms.txt").read_text()
+    assert llms.startswith("# Example")
+    assert rf"- [alpha]({host}alpha/llms.txt): CLI \*tool\*" in llms
+    assert f"- [zeta]({host}zeta/llms.txt): Line one Line two" in llms
+    assert "/html/llms.txt" not in llms
+    assert "/llms.txt" in (tmp_path / "index.html").read_text()
+    assert "/llms.txt" not in (tmp_path / "sitemap.xml").read_text()
+
+
+def test_empty_domain_llms(tmp_path):
+    _, ns = load()
+    ns["generate"]("Example", [], tmp_path)
+    assert "## Projects" in (tmp_path / "llms.txt").read_text()
