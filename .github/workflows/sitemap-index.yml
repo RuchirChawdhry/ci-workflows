@@ -151,6 +151,105 @@ jobs:
               path.write_bytes(data)
           
           
+          def write_robots(path, host, leaves):
+              groups = {
+                  "AI search, assistants and model crawlers": (
+                      "OAI-SearchBot",
+                      "GPTBot",
+                      "ChatGPT-User",
+                      "ClaudeBot",
+                      "Claude-SearchBot",
+                      "Claude-User",
+                      "anthropic-ai",
+                      "Claude-Web",
+                      "PerplexityBot",
+                      "Perplexity-User",
+                      "Google-Extended",
+                      "Google-CloudVertexBot",
+                      "GoogleOther",
+                      "GoogleOther-Image",
+                      "GoogleOther-Video",
+                      "Applebot-Extended",
+                      "Amazonbot",
+                      "Amzn-SearchBot",
+                      "Amzn-User",
+                      "Bytespider",
+                      "Meta-ExternalAgent",
+                      "Meta-ExternalFetcher",
+                      "Meta-WebIndexer",
+                      "FacebookBot",
+                      "DuckAssistBot",
+                      "MistralAI-User",
+                      "MistralAI-Index",
+                      "cohere-ai",
+                      "YouBot",
+                      "ExaSearchBot",
+                      "Diffbot",
+                      "omgili",
+                      "omgilibot",
+                  ),
+                  "Search engines": (
+                      "Googlebot",
+                      "Googlebot-Image",
+                      "Googlebot-Video",
+                      "Googlebot-News",
+                      "bingbot",
+                      "BingPreview",
+                      "msnbot",
+                      "Applebot",
+                      "DuckDuckBot",
+                      "DuckDuckGo-Favicons-Bot",
+                      "Baiduspider",
+                      "YandexBot",
+                      "YandexImages",
+                      "YandexVideo",
+                      "Slurp",
+                      "Sogou",
+                      "Exabot",
+                      "PetalBot",
+                      "SeznamBot",
+                      "NaverBot",
+                      "Yeti",
+                      "Qwantbot",
+                      "MojeekBot",
+                  ),
+                  "SEO and site audit crawlers": (
+                      "AhrefsBot",
+                      "AhrefsSiteAudit",
+                      "SemrushBot",
+                      "SiteAuditBot",
+                      "SplitSignalBot",
+                      "MJ12bot",
+                      "DotBot",
+                      "Rogerbot",
+                      "BLEXBot",
+                      "DataForSeoBot",
+                      "serpstatbot",
+                      "SiteCheckerBotCrawler",
+                      "RyteBot",
+                      "Screaming Frog SEO Spider",
+                  ),
+                  "Research, datasets and web archives": (
+                      "CCBot",
+                      "archive.org_bot",
+                      "ia_archiver",
+                      "Heritrix",
+                      "Nutch",
+                      "Scrapy",
+                      "TurnitinBot",
+                  ),
+              }
+              lines = ["# Public crawler access policy"]
+              for label, agents in groups.items():
+                  lines.extend(["", f"# {label}"])
+                  lines.extend(f"User-agent: {agent}" for agent in agents)
+                  lines.append("Allow: /")
+              lines.extend(["", "# All other crawlers", "User-agent: *", "Allow: /", "", "# Sitemaps"])
+              lines.extend(f"Sitemap: {url}" for url in dict.fromkeys([host + "sitemaps.xml", host + "sitemap.xml", *sorted(leaves)]))
+              path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+              print(f"Generated robots.txt: {sum(map(len, groups.values()))} named crawler tokens and wildcard; {len(leaves) + 2} sitemap declarations")
+          
+          
           def generate(owner, projects, output):
               host = f"https://{owner.lower()}.github.io/"
               output.mkdir(parents=True, exist_ok=True)
@@ -162,7 +261,7 @@ jobs:
                   pages.update(locations)
               write_xml(output / "sitemap.xml", "urlset", "url", pages)
               write_xml(output / "sitemaps.xml", "sitemapindex", "sitemap", [host + "sitemap.xml", *leaves])
-              (output / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {host}sitemaps.xml\n", encoding="utf-8")
+              write_robots(output / "robots.txt", host, leaves)
               links = "\n".join(
                   f'<li><a href="{html.escape(base, quote=True)}">{html.escape(name)}</a></li>'
                   for name, base, _ in projects

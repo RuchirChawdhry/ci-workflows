@@ -1,6 +1,7 @@
 """Test sitemap discovery and root generation without live network access."""
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from urllib.robotparser import RobotFileParser
 
 import pytest
 import yaml
@@ -71,3 +72,24 @@ def test_empty_portfolio_and_sitemap_limits(tmp_path):
     ns["LIMIT"] = 1
     with pytest.raises(ValueError, match="MB sitemap limit"):
         ns["write_xml"](tmp_path / "oversized.xml", "urlset", "url", ["https://example.github.io/"])
+
+
+def test_robots_explicitly_allows_crawlers_and_lists_all_sitemaps(tmp_path):
+    _, ns = load()
+    host = "https://example.github.io/"
+    leaves = {host + "demo/sitemap-0.xml", host + "other/sitemap.xml"}
+    path = tmp_path / "robots.txt"
+    ns["write_robots"](path, host, leaves)
+    lines = path.read_text().splitlines()
+    agents = [line.split(": ", 1)[1] for line in lines if line.startswith("User-agent: ")]
+    assert len(agents) == 78
+    assert len({agent.lower() for agent in agents}) == len(agents)
+    assert {"GPTBot", "OAI-SearchBot", "ClaudeBot", "Google-Extended", "Applebot-Extended",
+            "Googlebot", "bingbot", "AhrefsBot", "SemrushBot", "CCBot",
+            "archive.org_bot", "TurnitinBot", "*"} <= set(agents)
+    assert not any(line.startswith("Disallow:") for line in lines)
+    parser = RobotFileParser()
+    parser.parse(lines)
+    for agent in [*agents, "UnlistedResearchBot"]:
+        assert parser.can_fetch(agent, host + "demo/docs/")
+    assert parser.site_maps() == [host + "sitemaps.xml", host + "sitemap.xml", *sorted(leaves)]
