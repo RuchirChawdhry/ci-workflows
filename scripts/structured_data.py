@@ -1,15 +1,13 @@
 """Generate and verify JSON-LD for portfolio and wiki documentation HTML."""
 import argparse
 from datetime import datetime
-import html
 from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 CONTEXT = "https://schema.org"
@@ -37,7 +35,7 @@ REF_TYPES = {
     "about": {"SoftwareSourceCode", "SoftwareApplication", "Person", "Organization"},
 }
 URL_FIELDS = {"url", "sameAs", "codeRepository", "license", "downloadUrl"}
-VISIBLE = {"name", "description", "headline", "programmingLanguage", "runtimePlatform", "keywords", "version", "softwareVersion", "applicationCategory", "operatingSystem", "softwareRequirements", "dateModified"}
+TEXT_FIELDS = {"name", "description", "headline", "programmingLanguage", "runtimePlatform", "keywords", "version", "softwareVersion", "applicationCategory", "operatingSystem", "softwareRequirements"}
 OVERRIDES = {"description", "programmingLanguage", "runtimePlatform", "application", "pageTypes"}
 APP_FIELDS = {"name", "description", "applicationCategory", "operatingSystem", "softwareRequirements", "downloadUrl"}
 
@@ -226,42 +224,6 @@ class Page(HTMLParser):
             self.anchor_text.append(data)
 
 
-def escape(value):
-    return html.escape(str(value), quote=True)
-
-
-def anchor(name, url):
-    return f'<a href="{escape(url)}">{escape(name)}</a>'
-
-
-def facts(graph, metadata=None):
-    nodes = graph["@graph"]
-    owner = nodes[0]
-    rows = [("Maintained by", anchor(owner["name"], owner["url"]))]
-    for obj in nodes:
-        kind = obj["@type"]
-        if kind == "SoftwareSourceCode":
-            rows.append(("Source repository", anchor(obj["name"], obj["codeRepository"])))
-        if kind == "SoftwareApplication":
-            rows.append(("Application", escape(obj["name"])))
-        if kind in {"SoftwareSourceCode", "SoftwareApplication"}:
-            for field in ("description", "programmingLanguage", "runtimePlatform", "keywords", "version",
-                          "softwareVersion", "applicationCategory", "operatingSystem", "softwareRequirements"):
-                if field in obj:
-                    value = ", ".join(strings(obj[field]))
-                    rows.append((field, escape(value)))
-            if "license" in obj:
-                rows.append(("License", anchor((metadata or {}).get("license_name") or "License", obj["license"])))
-            if "downloadUrl" in obj:
-                rows.append(("Download", anchor("Download application", obj["downloadUrl"])))
-        if kind == "WebPage" and "dateModified" in obj:
-            rows.append(("Last modified", f'<time datetime="{escape(obj["dateModified"])}">{escape(obj["dateModified"])}</time>'))
-    if metadata and metadata.get("release_url"):
-        rows.append(("Latest release", anchor(metadata["release"], metadata["release_url"])))
-    return '<section aria-label="Project metadata"><h2>Project metadata</h2><dl>' + "".join(
-        f"<dt>{escape(label)}</dt><dd>{value}</dd>" for label, value in rows) + "</dl></section>"
-
-
 def validate(graph, page):
     if graph.get("@context") != CONTEXT or not isinstance(graph.get("@graph"), list):
         raise ValueError("Invalid JSON-LD context or graph")
@@ -270,6 +232,9 @@ def validate(graph, page):
     if len(by_id) != len(nodes):
         raise ValueError("Duplicate entity identifiers")
     visible = " ".join(" ".join(page.text).split())
+    heading = " ".join("".join(page.h1).split())
+    links = {urljoin(page.canonical or "", link).rstrip("/") for link in page.links}
+    canonical = (page.canonical or "").rstrip("/")
     for item in nodes:
         kind = item["@type"]
         if kind not in FIELDS or set(item) - FIELDS[kind] - {"@id", "@type"} or not url_ok(item["@id"]):
@@ -282,14 +247,24 @@ def validate(graph, page):
                 for url in strings(value):
                     if not url_ok(url):
                         raise ValueError(f"Invalid URL: {url}")
-                    if key in {"codeRepository", "license", "downloadUrl"} and url not in page.links:
-                        raise ValueError(f"URL not visible: {url}")
-            if key in VISIBLE:
-                for value_text in strings(value):
-                    if " ".join(value_text.split()) not in visible:
-                        raise ValueError(f"Structured value not visible: {key}={value_text}")
-            if key == "dateModified":
-                datetime.fromisoformat(value)
+            if key in TEXT_FIELDS:
+                strings(value)
+        # Validate page claims against existing content; repository facts are sourced
+        # separately from GitHub and explicit configuration, not invented UI.
+        if kind in {"WebPage", "CollectionPage"} and " ".join(item["name"].split()) != heading:
+            raise ValueError("Page name does not match the visible heading")
+        if kind in {"TechArticle", "APIReference"} and " ".join(item["headline"].split()) != heading:
+            raise ValueError("Article headline does not match the visible heading")
+        if kind == "SoftwareSourceCode" and item["codeRepository"].rstrip("/") not in links:
+            raise ValueError("Source repository is not linked from the documentation")
+        if kind == "SoftwareApplication":
+            for key in ("name", "description"):
+                if " ".join(item[key].split()) not in visible:
+                    raise ValueError(f"Application {key} must appear in authored content")
+            if "downloadUrl" in item and item["downloadUrl"].rstrip("/") not in links:
+                raise ValueError("Application download URL is not linked from the page")
+        if "dateModified" in item:
+            datetime.fromisoformat(item["dateModified"])
         if "itemListElement" in item:
             entries = item["itemListElement"]
             if item.get("numberOfItems", len(entries)) != len(entries) or (kind == "BreadcrumbList" and len(entries) < 2):
@@ -297,25 +272,22 @@ def validate(graph, page):
             for i, entry in enumerate(entries, 1):
                 if set(entry) != {"@type", "position", "name", "item"} or entry["@type"] != "ListItem" or entry["position"] != i or not url_ok(entry["item"]):
                     raise ValueError("Invalid list entry")
-                if entry["name"] not in visible or (entry["item"] not in page.links and entry["item"] != page.canonical):
-                    raise ValueError("List entry not visible")
+                target = entry["item"].rstrip("/")
+                if " ".join(entry["name"].split()) not in visible or (target not in links and target != canonical):
+                    raise ValueError("List entry does not match existing navigation")
+            if kind == "BreadcrumbList" and entries[-1]["item"].rstrip("/") != canonical:
+                raise ValueError("Breadcrumb destination does not match page")
     pages = [n for n in nodes if n["@type"] in {"WebPage", "CollectionPage"}]
     if len(pages) != 1 or pages[0]["url"].rstrip("/") != (page.canonical or "").rstrip("/"):
         raise ValueError("Page entity does not match canonical URL")
 
 
-def inject(path, graph, metadata=None):
+def inject(path, graph):
     document = path.read_text(encoding="utf-8")
     if Page(document).jsonld:
         raise ValueError(f"Existing JSON-LD in {path}")
-    breadcrumbs = next((n for n in graph["@graph"] if n["@type"] == "BreadcrumbList"), None)
-    navigation = ""
-    if breadcrumbs:
-        navigation = '<nav aria-label="Breadcrumb">' + " / ".join(
-            anchor(item["name"], item["item"]) for item in breadcrumbs["itemListElement"]) + "</nav>"
-    if "</main>" not in document or "</head>" not in document:
-        raise ValueError(f"Cannot locate HTML insertion points: {path}")
-    document = document.replace("</main>", navigation + facts(graph, metadata) + "</main>", 1)
+    if "</head>" not in document:
+        raise ValueError(f"Cannot locate HTML head: {path}")
     payload = json.dumps(graph, ensure_ascii=True, allow_nan=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     document = document.replace("</head>", '<script type="application/ld+json">' + payload + "</script></head>", 1)
     page = Page(document)
@@ -337,7 +309,7 @@ def wiki_site(dist, origin, repo, owner, metadata, config):
         url = origin + route
         graph = project_graph(origin, titles["Home"], titles[path.stem], url, owner, metadata, config,
                               modified(path, repo), config.get("pageTypes", {}).get(path.stem, "TechArticle"))
-        inject(dist / route / "index.html", graph, metadata)
+        inject(dist / route / "index.html", graph)
     print(f"Validated JSON-LD on {len(sources)} documentation pages")
 
 
