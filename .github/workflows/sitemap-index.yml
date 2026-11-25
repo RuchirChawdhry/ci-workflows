@@ -39,6 +39,7 @@ jobs:
           NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
           ET.register_namespace("", NS)
           LIMIT = 52_428_800
+          MAX_ENTRIES = 50_000
           
           
           def tag(name):
@@ -83,7 +84,7 @@ jobs:
           def sitemap_leaves(url, base, seen=None):
               seen = set() if seen is None else seen
               if url in seen or not in_project(url, base):
-                  return set()
+                  return {}
               if len(seen) >= 100:
                   raise ValueError(f"Too many sitemap references for {base}")
               seen.add(url)
@@ -92,26 +93,26 @@ jobs:
               except HTTPError as error:
                   if error.code in {404, 410}:
                       print(f"Sitemap unavailable ({error.code}): {url}")
-                      return set()
+                      return {}
                   raise
               if final != url or b"<!DOCTYPE" in data.upper():
                   print(f"Sitemap redirected or contains a prohibited DOCTYPE: {url} -> {final}")
-                  return set()
+                  return {}
               try:
                   root = ET.fromstring(data)
               except ET.ParseError:
                   print(f"Sitemap is not valid XML: {url}")
-                  return set()
+                  return {}
               if root.tag == tag("urlset"):
                   locations = [entry.findtext(tag("loc"), "").strip() for entry in root.findall(tag("url"))]
                   if not locations or not all(in_project(loc, base) for loc in locations):
                       print(f"Sitemap contains no URLs or out-of-scope URLs: {url}")
-                      return set()
-                  return {url}
+                      return {}
+                  return {url: set(locations)}
               if root.tag != tag("sitemapindex"):
                   print(f"Unexpected XML root in {url}: {root.tag}")
-                  return set()
-              leaves = set()
+                  return {}
+              leaves = {}
               for entry in root.findall(tag("sitemap")):
                   leaves.update(sitemap_leaves(entry.findtext(tag("loc"), "").strip(), base, seen))
               return leaves
@@ -129,7 +130,7 @@ jobs:
                   if not leaves:
                       leaves = sitemap_leaves(base + "sitemap.xml", base)
                   if leaves:
-                      projects.append((name, base, sorted(leaves)))
+                      projects.append((name, base, leaves))
                       print(f"Discovered {name}: {len(leaves)} sitemap(s)")
                   else:
                       print(f"::notice::No eligible sitemap for {name}")
@@ -138,10 +139,16 @@ jobs:
           
           def write_xml(path, kind, item, urls):
               root = ET.Element(tag(kind))
-              for url in sorted(set(urls)):
+              locations = sorted(set(urls))
+              if len(locations) > MAX_ENTRIES:
+                  raise ValueError(f"{path.name} exceeds the 50,000-entry sitemap limit")
+              for url in locations:
                   ET.SubElement(ET.SubElement(root, tag(item)), tag("loc")).text = url
               ET.indent(root)
-              ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+              data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+              if len(data) > LIMIT:
+                  raise ValueError(f"{path.name} exceeds the 50 MB sitemap limit")
+              path.write_bytes(data)
           
           
           def generate(owner, projects, output):
@@ -149,10 +156,13 @@ jobs:
               output.mkdir(parents=True, exist_ok=True)
               if Path("public").is_dir():
                   shutil.copytree("public", output, dirs_exist_ok=True)
-              write_xml(output / "sitemap-root.xml", "urlset", "url", [host])
-              write_xml(output / "sitemap.xml", "sitemapindex", "sitemap",
-                        [host + "sitemap-root.xml", *(url for _, _, leaves in projects for url in leaves)])
-              (output / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {host}sitemap.xml\n", encoding="utf-8")
+              leaves = {url: locations for _, _, project in projects for url, locations in project.items()}
+              pages = {host}
+              for locations in leaves.values():
+                  pages.update(locations)
+              write_xml(output / "sitemap.xml", "urlset", "url", pages)
+              write_xml(output / "sitemaps.xml", "sitemapindex", "sitemap", [host + "sitemap.xml", *leaves])
+              (output / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {host}sitemaps.xml\n", encoding="utf-8")
               links = "\n".join(
                   f'<li><a href="{html.escape(base, quote=True)}">{html.escape(name)}</a></li>'
                   for name, base, _ in projects
@@ -165,17 +175,19 @@ jobs:
                   f'<link rel="canonical" href="{host}"></head><body>'
                   f'<main><h1>Open-source project documentation</h1><p>Published project websites by '
                   f'<a href="https://github.com/{html.escape(owner, quote=True)}">{html.escape(owner)}</a>.</p>'
-                  f'<ul>{links}</ul><p><a href="/sitemap.xml">Sitemap</a></p></main></body></html>\n',
+                  f'<ul>{links}</ul><p><a href="/sitemap.xml">All page URLs</a> · <a href="/sitemaps.xml">Sitemap index</a></p></main></body></html>\n',
                   encoding="utf-8",
               )
+              print(f"Generated sitemap.xml: {len(pages)} unique page URLs; sitemaps.xml: {len(leaves) + 1} sitemap files")
+              return len(pages), len(leaves) + 1
           
           
           if __name__ == "__main__":
               owner = os.environ["GITHUB_REPOSITORY_OWNER"]
               projects = discover(owner, repositories(owner, os.environ["GH_TOKEN"]))
-              generate(owner, projects, Path("dist"))
+              page_count, sitemap_count = generate(owner, projects, Path("dist"))
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-                  summary.write(f"## Sitemap index\n\nDiscovered {len(projects)} project site(s).\n")
+                  summary.write(f"## Sitemap index\n\nDiscovered {len(projects)} project site(s).\n\n- sitemap.xml: {page_count} unique page URLs\n- sitemaps.xml: {sitemap_count} sitemap files\n")
                   for name, _, leaves in projects:
                       summary.write(f"- {name}: {len(leaves)} sitemap(s)\n")
           PY

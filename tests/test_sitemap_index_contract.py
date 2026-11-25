@@ -2,6 +2,7 @@
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,12 @@ def test_discovery_flattens_indexes_and_excludes_other_hosts(tmp_path):
     base = "https://example.github.io/demo/"
     prefix = '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
     index = prefix + f"<sitemap><loc>{base}sitemap-0.xml</loc></sitemap>" + "<sitemap><loc>https://other.example/sitemap.xml</loc></sitemap></sitemapindex>"
-    urlset = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + f"<url><loc>{base.rstrip(chr(47))}</loc></url></urlset>"
+    urlset = (
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"<url><loc>{base.rstrip('/')}</loc></url>"
+        f"<url><loc>{base}docs/</loc></url>"
+        f"<url><loc>{base}docs/</loc></url></urlset>"
+    )
     responses = {base + "sitemap-index.xml": index, base + "sitemap-0.xml": urlset}
     ns["request"] = lambda url: (url, responses[url].encode())
     projects = ns["discover"]("Example", [
@@ -38,10 +44,30 @@ def test_discovery_flattens_indexes_and_excludes_other_hosts(tmp_path):
         {"name": "hidden", "has_pages": True, "private": True},
         {"name": "example.github.io", "has_pages": True},
     ])
-    assert projects == [("demo", base, [base + "sitemap-0.xml"])]
+    assert projects == [("demo", base, {base + "sitemap-0.xml": {base.rstrip("/"), base + "docs/"}})]
     ns["generate"]("Example", projects, tmp_path)
     root = ET.parse(tmp_path / "sitemap.xml").getroot()
+    assert root.tag == ns["tag"]("urlset")
     locs = [entry.findtext(ns["tag"]("loc")) for entry in root]
-    assert locs == [base + "sitemap-0.xml", "https://example.github.io/sitemap-root.xml"]
-    assert "Sitemap: https://example.github.io/sitemap.xml" in (tmp_path / "robots.txt").read_text()
+    assert locs == ["https://example.github.io/", base.rstrip("/"), base + "docs/"]
+    index = ET.parse(tmp_path / "sitemaps.xml").getroot()
+    assert index.tag == ns["tag"]("sitemapindex")
+    assert [entry.findtext(ns["tag"]("loc")) for entry in index] == [
+        base + "sitemap-0.xml", "https://example.github.io/sitemap.xml"
+    ]
+    assert not (tmp_path / "sitemap-root.xml").exists()
+    assert "Sitemap: https://example.github.io/sitemaps.xml" in (tmp_path / "robots.txt").read_text()
     assert base in (tmp_path / "index.html").read_text()
+
+
+def test_empty_portfolio_and_sitemap_limits(tmp_path):
+    _, ns = load()
+    assert ns["generate"]("Example", [], tmp_path) == (1, 1)
+    root = ET.parse(tmp_path / "sitemap.xml").getroot()
+    assert [entry.findtext(ns["tag"]("loc")) for entry in root] == ["https://example.github.io/"]
+    ns["MAX_ENTRIES"] = 1
+    with pytest.raises(ValueError, match="entry sitemap limit"):
+        ns["write_xml"](tmp_path / "oversized.xml", "urlset", "url", ["https://example.github.io/", "https://example.github.io/demo/"])
+    ns["LIMIT"] = 1
+    with pytest.raises(ValueError, match="MB sitemap limit"):
+        ns["write_xml"](tmp_path / "oversized.xml", "urlset", "url", ["https://example.github.io/"])
