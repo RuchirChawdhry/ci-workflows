@@ -56,7 +56,8 @@ jobs:
           shopt -s nullglob
           wheels=("$RUNNER_TEMP/copier-dist/"*.whl)
           sdists=("$RUNNER_TEMP/copier-dist/"*.tar.gz)
-          test "${#wheels[@]}" -eq 1 && test "${#sdists[@]}" -eq 1
+          test "${#wheels[@]}" -eq 1
+          test "${#sdists[@]}" -eq 1
           # WinUI intentionally has no README yet; twine warns about that.
           if [[ "$PROFILE" == winui ]]; then
             uvx twine check "${wheels[0]}" "${sdists[0]}"
