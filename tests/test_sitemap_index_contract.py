@@ -30,7 +30,7 @@ def test_discovery_flattens_indexes_and_excludes_other_hosts(tmp_path):
     base = "https://example.github.io/demo/"
     prefix = '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
     index = prefix + f"<sitemap><loc>{base}sitemap-0.xml</loc></sitemap>" + "<sitemap><loc>https://other.example/sitemap.xml</loc></sitemap></sitemapindex>"
-    urlset = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + f"<url><loc>{base}</loc></url></urlset>"
+    urlset = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + f"<url><loc>{base.rstrip(chr(47))}</loc></url></urlset>"
     responses = {base + "sitemap-index.xml": index, base + "sitemap-0.xml": urlset}
     ns["request"] = lambda url: (url, responses[url].encode())
     projects = ns["discover"]("Example", [

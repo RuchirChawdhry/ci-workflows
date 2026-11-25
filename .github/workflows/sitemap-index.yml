@@ -74,7 +74,7 @@ jobs:
               return (
                   parsed.scheme == "https"
                   and parsed.netloc == scope.netloc
-                  and parsed.path.startswith(scope.path)
+                  and (parsed.path == scope.path.rstrip('/') or parsed.path.startswith(scope.path))
                   and not parsed.query and not parsed.fragment
                   and not any(part in {".", ".."} for part in parsed.path.split("/"))
               )
@@ -101,7 +101,10 @@ jobs:
                   return set()
               if root.tag == tag("urlset"):
                   locations = [entry.findtext(tag("loc"), "").strip() for entry in root.findall(tag("url"))]
-                  return {url} if locations and all(in_project(loc, base) for loc in locations) else set()
+                  if not locations or not all(in_project(loc, base) for loc in locations):
+                    print(f"Sitemap contains no URLs or out-of-scope URLs: {url}")
+                    return set()
+                return {url}
               if root.tag != tag("sitemapindex"):
                   return set()
               leaves = set()
