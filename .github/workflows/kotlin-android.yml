@@ -35,9 +35,11 @@ jobs:
       - if: inputs.template
         uses: astral-sh/setup-uv@v6
       - if: inputs.template
-        name: Generate projects and validate inputs
+        name: Generate project
+        run: uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD . generated
+      - if: inputs.template && inputs.mode == 'checks'
+        name: Validate alternate and invalid inputs
         run: |
-          uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD . generated
           uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD -d project_name='Another App' -d application_id=org.example.another . alternate
           test -f alternate/app/src/main/java/org/example/another/MainActivity.kt
           if uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD -d application_id='bad-id' . invalid; then
@@ -48,13 +50,18 @@ jobs:
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'emulator'
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
-      - name: Check, test and build
+      - if: inputs.mode == 'checks'
+        name: Check, test and build
         working-directory: ${{ env.PROJECT }}
         run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --stacktrace
-      - if: inputs.template
+      - if: inputs.template && inputs.mode == 'checks'
         name: Build alternate application ID
         working-directory: alternate
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
+      - if: inputs.mode == 'screenshots'
+        name: Build screenshot application and instrumentation
+        working-directory: ${{ env.PROJECT }}
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -75,6 +82,13 @@ jobs:
           echo '## Android validation' >> "$GITHUB_STEP_SUMMARY"
           echo 'Mode: ${{ inputs.mode }}; API: ${{ inputs.api }}' >> "$GITHUB_STEP_SUMMARY"
           find "$PROJECT/app/build/outputs/apk" -name '*.apk' -printf '%f: %s bytes\n' >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Upload screenshot set
+        if: success() && inputs.mode == 'screenshots'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ui-screenshots
+          path: ${{ env.PROJECT }}/screenshots/*.png
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -84,5 +98,4 @@ jobs:
             ${{ env.PROJECT }}/app/build/reports/
             ${{ env.PROJECT }}/app/build/test-results/
             ${{ env.PROJECT }}/reports/
-            ${{ env.PROJECT }}/screenshots/
           if-no-files-found: warn
