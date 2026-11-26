@@ -1,0 +1,150 @@
+name: Chromium release
+
+on:
+  workflow_call:
+    inputs:
+      kind:
+        description: template or extension
+        type: string
+        required: true
+      publish:
+        description: Publish a GitHub Release instead of only uploading artifacts
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Determine version
+        id: version
+        env:
+          KIND: ${{ inputs.kind }}
+        run: |
+          set -euo pipefail
+          case "$KIND" in
+            template) version="$(cat VERSION)" ;;
+            extension) version="$(node -p "require('./package.json').version")" ;;
+            *) exit 1 ;;
+          esac
+          [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            test "$GITHUB_REF_NAME" = "v$version"
+          fi
+      - name: Render and test Copier template
+        if: inputs.kind == 'template'
+        run: |
+          python -m pip install copier==9.14.1
+          python -m unittest discover -s tests
+          copier copy --defaults --vcs-ref=HEAD . "$RUNNER_TEMP/generated"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Validate, benchmark and package
+        env:
+          KIND: ${{ inputs.kind }}
+        run: |
+          set -euo pipefail
+          if ! command -v corepack >/dev/null; then npm install --global corepack@0.34.5; fi
+          corepack enable
+          if [[ "$KIND" == template ]]; then cd "$RUNNER_TEMP/generated"; fi
+          pnpm install --frozen-lockfile
+          pnpm check
+          pnpm build
+          pnpm verify:build
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test
+          node scripts/bench.mjs --runs=21
+          node scripts/report-size.mjs
+          node scripts/package.mjs
+          mkdir -p "$RUNNER_TEMP/release"
+          cp release/*.zip "$RUNNER_TEMP/release/"
+          cp reports/performance.json reports/bundle-size.json "$RUNNER_TEMP/release/"
+      - name: Assemble release assets
+        env:
+          KIND: ${{ inputs.kind }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$KIND" == template ]]; then
+            git archive --format=zip --prefix="copier-chrome-extension-$TAG/" HEAD > "$RUNNER_TEMP/release/copier-chrome-extension-$TAG.zip"
+          fi
+          cd "$RUNNER_TEMP/release"
+          sha256sum -- *.zip *.json > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          {
+            echo '## Release candidate'
+            echo
+            echo "Tag: $TAG"
+            echo
+            cat SHA256SUMS.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: chromium-release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: release-diagnostics
+          path: |
+            reports/
+            test-results/
+            playwright-report/
+            ${{ runner.temp }}/generated/reports/
+            ${{ runner.temp }}/generated/test-results/
+            ${{ runner.temp }}/generated/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+  publish:
+    needs: build
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Publish validated assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+          KIND: ${{ inputs.kind }}
+        run: |
+          set -euo pipefail
+          if [[ "$KIND" == template ]]; then
+            test "$GITHUB_REF" = refs/heads/main
+          else
+            test "$GITHUB_REF" = "refs/tags/$TAG"
+          fi
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name chromium-release --dir release
+          cd release
+          sha256sum --check SHA256SUMS.txt
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          if [[ "$KIND" == template ]]; then
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+              echo "Tag $TAG already exists; choose a new version." >&2
+              exit 1
+            fi
+            gh release create "$TAG" ./*.zip ./*.json SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
+          else
+            gh release create "$TAG" ./*.zip ./*.json SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+          fi
