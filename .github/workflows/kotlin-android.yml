@@ -53,7 +53,7 @@ jobs:
       - if: inputs.mode == 'checks'
         name: Check, test and build
         working-directory: ${{ env.PROJECT }}
-        run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --stacktrace
+        run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --continue --stacktrace
       - if: inputs.template && inputs.mode == 'checks'
         name: Build alternate application ID
         working-directory: alternate
@@ -95,6 +95,8 @@ jobs:
           name: android-api-${{ inputs.api }}-${{ inputs.mode }}
           path: |
             ${{ env.PROJECT }}/app/build/outputs/
+            ${{ env.PROJECT }}/build/reports/
+            ${{ env.PROJECT }}/benchmark/build/reports/
             ${{ env.PROJECT }}/app/build/reports/
             ${{ env.PROJECT }}/app/build/test-results/
             ${{ env.PROJECT }}/reports/
