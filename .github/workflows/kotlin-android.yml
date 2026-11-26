@@ -22,6 +22,8 @@ jobs:
       ANDROID_CI_MODE: ${{ inputs.mode }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -46,22 +48,29 @@ jobs:
             echo 'Invalid application ID accepted' >&2
             exit 1
           fi
-      - name: Install SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'emulator'
+      - name: Install project SDK
+        working-directory: ${{ env.PROJECT }}
+        run: bash scripts/sdk.sh install
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
       - if: inputs.mode == 'checks'
         name: Check, test and build
         working-directory: ${{ env.PROJECT }}
-        run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --continue --stacktrace
+        run: bash scripts/ci-check.sh
       - if: inputs.template && inputs.mode == 'checks'
         name: Build alternate application ID
         working-directory: alternate
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
+        run: bash scripts/ci-check.sh
       - if: inputs.mode == 'screenshots'
         name: Build screenshot application and instrumentation
         working-directory: ${{ env.PROJECT }}
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+        run: bash scripts/ci-check.sh screenshots
+      - if: inputs.template && inputs.mode == 'checks'
+        name: Generate optional capability profile
+        run: |
+          uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD -d include_http=true -d include_background_jobs=true -d include_file_access=true -d include_notifications=true . optional
+          cd optional
+          ./gradlew :app:assembleDebug --stacktrace
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -100,4 +109,6 @@ jobs:
             ${{ env.PROJECT }}/app/build/reports/
             ${{ env.PROJECT }}/app/build/test-results/
             ${{ env.PROJECT }}/reports/
+            alternate/reports/
+            optional/app/build/outputs/
           if-no-files-found: warn
