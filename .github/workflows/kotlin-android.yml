@@ -1,0 +1,86 @@
+name: Kotlin Android
+on:
+  workflow_call:
+    inputs:
+      template:
+        type: boolean
+        default: false
+      mode:
+        type: string
+        default: checks
+      api:
+        type: number
+        default: 35
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PROJECT: ${{ inputs.template && 'generated' || '.' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+      - if: inputs.template
+        uses: astral-sh/setup-uv@v6
+      - if: inputs.template
+        name: Generate projects and validate inputs
+        run: |
+          uvx --from copier==9.10.3 copier copy --defaults --vcs-ref=HEAD . generated
+          uvx --from copier==9.10.3 copier copy --defaults --vcs-ref=HEAD -d project_name='Another App' -d application_id=org.example.another . alternate
+          test -f alternate/app/src/main/java/org/example/another/MainActivity.kt
+          if uvx --from copier==9.10.3 copier copy --defaults --vcs-ref=HEAD -d application_id='bad-id' . invalid; then
+            echo 'Invalid application ID accepted' >&2
+            exit 1
+          fi
+      - name: Install SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+      - name: Check, test and build
+        working-directory: ${{ env.PROJECT }}
+        run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --stacktrace
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Emulator tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ inputs.api }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          script: |
+            cd "$PROJECT"
+            if [ '${{ inputs.mode }}' = screenshots ]; then
+              bash scripts/screenshots.sh
+            else
+              ./gradlew connectedDebugAndroidTest --stacktrace
+            fi
+            mkdir -p reports
+            adb logcat -d > reports/logcat.txt
+      - name: Report
+        if: always()
+        run: |
+          echo '## Android validation' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Mode: ${{ inputs.mode }}; API: ${{ inputs.api }}' >> "$GITHUB_STEP_SUMMARY"
+          find "$PROJECT/app/build/outputs/apk" -name '*.apk' -printf '%f: %s bytes\n' >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-api-${{ inputs.api }}-${{ inputs.mode }}
+          path: |
+            ${{ env.PROJECT }}/app/build/outputs/
+            ${{ env.PROJECT }}/app/build/reports/
+            ${{ env.PROJECT }}/app/build/test-results/
+            ${{ env.PROJECT }}/reports/
+            ${{ env.PROJECT }}/screenshots/
+          if-no-files-found: warn
