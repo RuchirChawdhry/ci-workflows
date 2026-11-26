@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 45
     env:
       PROJECT: ${{ inputs.template && 'generated' || '.' }}
+      ANDROID_CI_MODE: ${{ inputs.mode }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -32,10 +33,10 @@ jobs:
       - if: inputs.template
         name: Generate projects and validate inputs
         run: |
-          uvx --from copier==9.10.3 copier copy --defaults --vcs-ref=HEAD . generated
-          uvx --from copier==9.10.3 copier copy --defaults --vcs-ref=HEAD -d project_name='Another App' -d application_id=org.example.another . alternate
+          uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD . generated
+          uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD -d project_name='Another App' -d application_id=org.example.another . alternate
           test -f alternate/app/src/main/java/org/example/another/MainActivity.kt
-          if uvx --from copier==9.10.3 copier copy --defaults --vcs-ref=HEAD -d application_id='bad-id' . invalid; then
+          if uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD -d application_id='bad-id' . invalid; then
             echo 'Invalid application ID accepted' >&2
             exit 1
           fi
@@ -46,6 +47,10 @@ jobs:
       - name: Check, test and build
         working-directory: ${{ env.PROJECT }}
         run: ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --stacktrace
+      - if: inputs.template
+        name: Build alternate application ID
+        working-directory: alternate
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -58,15 +63,8 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_6
-          script: |
-            cd "$PROJECT"
-            if [ '${{ inputs.mode }}' = screenshots ]; then
-              bash scripts/screenshots.sh
-            else
-              ./gradlew connectedDebugAndroidTest --stacktrace
-            fi
-            mkdir -p reports
-            adb logcat -d > reports/logcat.txt
+          working-directory: ${{ env.PROJECT }}
+          script: bash scripts/ci-device.sh
       - name: Report
         if: always()
         run: |
