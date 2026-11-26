@@ -29,6 +29,7 @@ Python workflows intentionally use **uv** throughout. This is an opinionated too
 | Copier | [Template rendering and validation](docs/copier-ci.md), Python CLI, FastAPI, WinUI and Chromium |
 | Python | [uv monorepo CI](docs/python-cli.md), Ruff, pytest, wheel builds, compatibility checks |
 | JavaScript / TypeScript | [Node.js CI](docs/node-ci.md), Electron, Svelte, npm/pnpm/Yarn, builds |
+| Chromium releases | [Validated GitHub releases](docs/chromium-release.md), Copier archives, extension ZIPs and performance reports |
 | PowerShell | PSScriptAnalyzer, Pester, syntax validation |
 | Packaging | Scoop, build artifacts, GitHub Releases |
 | Security | Actionlint, Zizmor, Semgrep |
