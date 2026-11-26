@@ -50,24 +50,51 @@ jobs:
           fi
       - name: Install project SDK
         working-directory: ${{ env.PROJECT }}
-        run: bash scripts/sdk.sh install
+        run: |
+          if [ -f scripts/sdk.sh ]; then
+            bash scripts/sdk.sh install
+          else
+            sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'emulator'
+          fi
+      - name: Validate host tooling
+        working-directory: ${{ env.PROJECT }}
+        run: |
+          if [ -f scripts/test-tooling.py ]; then
+            python3 scripts/test-tooling.py
+          fi
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
       - if: inputs.mode == 'checks'
         name: Check, test and build
         working-directory: ${{ env.PROJECT }}
-        run: bash scripts/ci-check.sh
+        run: |
+          if [ -f scripts/ci-check.sh ]; then
+            bash scripts/ci-check.sh
+          else
+            ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --continue --stacktrace
+          fi
       - if: inputs.template && inputs.mode == 'checks'
         name: Build alternate application ID
         working-directory: alternate
-        run: bash scripts/ci-check.sh
+        run: |
+          if [ -f scripts/ci-check.sh ]; then
+            bash scripts/ci-check.sh
+          else
+            ./gradlew ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug assembleRelease --continue --stacktrace
+          fi
       - if: inputs.mode == 'screenshots'
         name: Build screenshot application and instrumentation
         working-directory: ${{ env.PROJECT }}
-        run: bash scripts/ci-check.sh screenshots
+        run: |
+          if [ -f scripts/ci-check.sh ]; then
+            bash scripts/ci-check.sh screenshots
+          else
+            ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          fi
       - if: inputs.template && inputs.mode == 'checks'
         name: Generate optional capability profile
         run: |
+          if ! grep -q '^include_http:' copier.yml; then exit 0; fi
           uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD -d include_http=true -d include_background_jobs=true -d include_file_access=true -d include_notifications=true . optional
           cd optional
           ./gradlew :app:assembleDebug --stacktrace
