@@ -27,7 +27,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - uses: android-actions/setup-android@v3
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
       - if: inputs.template
         uses: astral-sh/setup-uv@v6
       - if: inputs.template
@@ -41,7 +45,7 @@ jobs:
             exit 1
           fi
       - name: Install SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'emulator'
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
       - name: Check, test and build
