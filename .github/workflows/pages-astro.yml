@@ -3,6 +3,14 @@ name: Astro GitHub Pages
 on:
   workflow_call:
     inputs:
+      rss:
+        description: Generate a public release RSS feed alongside the website
+        type: boolean
+        default: false
+      rss-include-prereleases:
+        description: Include prereleases in RSS
+        type: boolean
+        default: false
       site-path:
         description: Astro project root, relative to the caller repository
         type: string
@@ -43,6 +51,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Checkout shared RSS generator
+        if: ${{ inputs.rss }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci-workflows
+          persist-credentials: false
+      - name: Generate release RSS in Astro public directory
+        if: ${{ inputs.rss }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SITE_PATH: ${{ inputs.site-path }}
+          PRERELEASES: ${{ inputs.rss-include-prereleases }}
+        run: |
+          args=()
+          if [[ "$PRERELEASES" == true ]]; then args+=(--include-prereleases); fi
+          python3 .ci-workflows/scripts/rss.py project --output "$SITE_PATH/public/rss.xml" "${args[@]}"
       - name: Build Astro and upload Pages artifact
         uses: withastro/action@a8b97df764791eb61fbf3338ef713b0e61ae05c5 # v6
         with:
