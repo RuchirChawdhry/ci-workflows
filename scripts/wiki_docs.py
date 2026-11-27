@@ -131,11 +131,11 @@ def prepare(wiki, site, origin, repo_url, description):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--wiki", type=Path, required=True)
-    parser.add_argument("--site", type=Path, required=True)
-    parser.add_argument("--origin", required=True)
-    parser.add_argument("--repo", required=True)
-    parser.add_argument("--description", required=True)
-    args = parser.parse_args()
+    cli = argparse.ArgumentParser()
+    cli.add_argument("--wiki", type=Path, required=True)
+    cli.add_argument("--site", type=Path, required=True)
+    cli.add_argument("--origin", required=True)
+    cli.add_argument("--repo", required=True)
+    cli.add_argument("--description", required=True)
+    args = cli.parse_args()
     prepare(args.wiki, args.site, args.origin, args.repo, args.description)

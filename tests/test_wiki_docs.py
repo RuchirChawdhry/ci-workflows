@@ -83,3 +83,26 @@ def test_unknown_wiki_page():
     import pytest
     with pytest.raises(ValueError, match="Unknown wiki page: Missing"):
         rewrite("[Missing](Missing)", {}, "https://example.github.io/", False)
+
+
+def test_cli_entrypoint(tmp_path):
+    import subprocess
+
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "Home.md").write_text("# Example\n\n[Start](Getting-Started)\n")
+    (wiki / "Getting-Started.md").write_text("# Start\n")
+    (wiki / "_Sidebar.md").write_text("[Start](Getting-Started)\n")
+    site = tmp_path / "site"
+    subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[1] / "scripts/wiki_docs.py"),
+            "--wiki", str(wiki), "--site", str(site),
+            "--origin", "https://example.github.io/demo/",
+            "--repo", "https://github.com/example/demo",
+            "--description", "Example",
+        ],
+        check=True,
+    )
+    assert (site / "public/llms.txt").is_file()
