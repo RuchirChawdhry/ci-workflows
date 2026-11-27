@@ -21,21 +21,23 @@ jobs:
       PROJECT: ${{ inputs.template && 'generated' || '.' }}
       ANDROID_CI_MODE: ${{ inputs.mode }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: false
       - if: inputs.template
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: false # Copier is invoked via uvx; this repository has no Python lockfile.
       - if: inputs.template
         name: Generate project
         run: uvx --from copier==9.19.1 copier copy --defaults --vcs-ref=HEAD . generated
@@ -63,7 +65,7 @@ jobs:
             python3 scripts/test-tooling.py
           fi
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - if: inputs.mode == 'checks'
         name: Check, test and build
         working-directory: ${{ env.PROJECT }}
@@ -104,7 +106,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Emulator tests
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ inputs.api }}
           arch: x86_64
@@ -120,12 +122,12 @@ jobs:
           find "$PROJECT/app/build/outputs/apk" -name '*.apk' -printf '%f: %s bytes\n' >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - name: Upload screenshot set
         if: success() && inputs.mode == 'screenshots'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-ui-screenshots
           path: ${{ env.PROJECT }}/screenshots/*.png
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: android-api-${{ inputs.api }}-${{ inputs.mode }}
