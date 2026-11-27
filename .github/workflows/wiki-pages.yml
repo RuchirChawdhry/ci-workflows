@@ -26,6 +26,11 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci-workflows
           persist-credentials: false
+      - name: Set up uv for Markdown processing
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
       - name: Prepare Starlight and agent documentation
         env:
           DESCRIPTION: ${{ github.event.repository.description }}
@@ -39,7 +44,7 @@ jobs:
           cp .ci-workflows/website/src/styles/starlight.css "$SITE/src/styles/"
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           repo="${GITHUB_REPOSITORY#*/}"
-          python3 .ci-workflows/scripts/wiki_docs.py --wiki wiki --site "$SITE" \
+          uv run --no-project --with-requirements .ci-workflows/scripts/markdown-requirements.txt python .ci-workflows/scripts/wiki_docs.py --wiki wiki --site "$SITE" \
             --origin "https://$owner.github.io/$repo/" --repo "https://github.com/$GITHUB_REPOSITORY" \
             --description "${DESCRIPTION:-$repo documentation}"
           {
@@ -57,7 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 .ci-workflows/scripts/structured_data.py wiki --dist "$RUNNER_TEMP/wiki-docs/dist" --origin "$DOCS_SITE$DOCS_BASE/"
+          uv run --no-project --with-requirements .ci-workflows/scripts/markdown-requirements.txt python .ci-workflows/scripts/structured_data.py wiki --dist "$RUNNER_TEMP/wiki-docs/dist" --origin "$DOCS_SITE$DOCS_BASE/"
       - name: Validate agent documentation and sitemap
         run: |
           python3 .ci-workflows/scripts/validate_wiki_docs.py "$RUNNER_TEMP/wiki-docs/dist" "$DOCS_SITE$DOCS_BASE/"
