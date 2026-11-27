@@ -11,6 +11,10 @@ on:
         description: JSON or YAML mapping of Copier answers for this variant
         type: string
         default: '{}'
+      python-typecheck:
+        description: Run ty against generated Python source before pytest
+        type: boolean
+        default: false
       artifact-suffix:
         description: Unique suffix when validating several variants in one run
         type: string
@@ -81,7 +85,7 @@ jobs:
           project-path: .ci-generated
           python-version: ${{ steps.python_version.outputs.version }}
           setup-uv: 'false'
-          test-command: pytest -q --junitxml="$REPORT_DIR/generated-python.xml"
+          test-command: ${{ inputs.python-typecheck && 'ty check src && pytest -q --benchmark-disable --junitxml="$REPORT_DIR/generated-python.xml"' || 'pytest -q --junitxml="$REPORT_DIR/generated-python.xml"' }}
       - name: Build Python distributions
         id: build_python_distributions
         if: inputs.profile != 'chromium'

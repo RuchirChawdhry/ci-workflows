@@ -12,7 +12,7 @@ def test_copier_workflow_contract():
     )
     assert set(workflow["on"]) == {"workflow_call"}
     inputs = workflow["on"]["workflow_call"]["inputs"]
-    assert set(inputs) == {"profile", "copier-data", "artifact-suffix"}
+    assert set(inputs) == {"profile", "copier-data", "artifact-suffix", "python-typecheck"}
     assert inputs["copier-data"]["default"] == "{}"
     assert inputs["artifact-suffix"]["default"] == ""
     assert inputs["profile"]["default"] == "python"
@@ -57,6 +57,7 @@ def test_version_setup_and_reports():
     assert quality["python-version"] == version
     assert quality["setup-uv"] == "false"
     assert "generated-python.xml" in quality["test-command"]
+    assert "ty check src" in quality["test-command"]
     assert steps["build_python_distributions"]["env"]["PYTHON_VERSION"] == version
     assert steps["install_and_verify_winui_wheel"]["env"]["PYTHON_VERSION"] == version
     smoke = steps["smoke_test_installed_cli"]["with"]

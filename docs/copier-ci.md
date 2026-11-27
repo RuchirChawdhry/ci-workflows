@@ -65,3 +65,7 @@ jobs:
       copier-data: '{"enable_jobs": false}'
       artifact-suffix: '-minimal'
 ```
+
+Set `python-typecheck: true` for generated Python projects that include `ty` and
+`pytest-benchmark` in their dev group. CI checks `src` with ty and executes benchmark
+tests without timing loops during ordinary validation.
