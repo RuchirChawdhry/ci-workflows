@@ -87,6 +87,7 @@ def write_feed(output, title, base, items, limit):
     channel = ET.SubElement(root, "channel")
     for name, value in {"title": title, "link": base, "description": f"Published updates for {title}"}.items():
         ET.SubElement(channel, name).text = clean(value)
+    ET.SubElement(channel, "generator").text = "ci-workflows RSS"
     ET.SubElement(channel, f"{{{ATOM}}}link", href=base + "rss.xml", rel="self", type="application/rss+xml")
     selected = select(items, limit)
     if selected:
@@ -107,11 +108,15 @@ def write_feed(output, title, base, items, limit):
 
 
 def parse_project(data, owner, name):
-    if b"<!DOCTYPE" in data.upper() or b"<!ENTITY" in data.upper():
+    data = data.decode("utf-8-sig")
+    if "<!DOCTYPE" in data.upper() or "<!ENTITY" in data.upper():
         raise ValueError("DTD/entity declarations are not allowed")
     root = ET.fromstring(data)
     if root.tag != "rss" or root.get("version") != "2.0" or root.find("channel") is None:
         raise ValueError("Expected RSS 2.0 channel")
+    if root.findtext("channel/generator") != "ci-workflows RSS":
+        print(f"Skipping unrelated RSS feed: {name}")
+        return
     for node in root.findall("channel/item"):
         item = {field: node.findtext(field, "").strip() for field in ("title", "link", "description", "pubDate", "guid")}
         prefix = f"/{owner}/{name}/releases/tag/".lower()
