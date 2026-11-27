@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from wiki_docs import prepare
+from wiki_docs import prepare, rewrite, parser, link_tokens
 
 
 def test_wiki_docs(tmp_path):
@@ -45,3 +45,41 @@ def test_optional_landing_preserves_markdown_mirror(tmp_path):
     assert "project-highlights" not in mirror
     assert json.loads((site / "docs-meta.json").read_text())["title"] == "demo-cli"
     assert "template: splash" not in (site / "src/content/docs/getting-started.md").read_text()
+
+
+def test_markdown_links_and_gfm():
+    base = "https://example.github.io/demo/"
+    text = """[**Nested** label](Guide.md#section "Title")
+
+[Reference][page]
+
+[page]: Guide
+
+`[code](Unknown)`
+
+![image](logo.png)
+
+- [x] Done
+
+| A | B |
+|---|---|
+| 1 | 2 |
+
+~~~markdown
+[not a link](Unknown)
+~~~
+"""
+    result = rewrite(text, {"Guide": "guide/"}, base, True)
+    links = [token.attrGet("href") for token in link_tokens(parser().parse(result))]
+    assert links == [base + "guide/index.md#section", base + "guide/index.md"]
+    assert "[code](Unknown)" in result
+    assert "[not a link](Unknown)" in result
+    assert "![image](logo.png)" in result
+    assert "[x] Done" in result
+    assert any(token.type == "table_open" for token in parser().parse(result))
+
+
+def test_unknown_wiki_page():
+    import pytest
+    with pytest.raises(ValueError, match="Unknown wiki page: Missing"):
+        rewrite("[Missing](Missing)", {}, "https://example.github.io/", False)
