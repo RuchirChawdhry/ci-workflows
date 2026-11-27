@@ -27,10 +27,12 @@ class FeedTests(unittest.TestCase):
     def test_round_trip_dedup_and_order(self):
         items = list(rss.release_items("owner/project", [release(1), release(2, "2026-02-01T00:00:00Z")]))
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "rss.xml"
+            path = Path(directory) / "feed.rss"
             rss.write_feed(path, "Project", "https://owner.github.io/project/", items + items, 10)
             root = ET.parse(path).getroot()
             self.assertEqual(len(root.findall("channel/item")), 2)
+            self.assertEqual(root.find("channel/{http://www.w3.org/2005/Atom}link").get("href"),
+                             "https://owner.github.io/project/feed.rss")
             self.assertEqual(root.findtext("channel/item/guid"), "github-release:2")
             self.assertEqual(root.find("channel/item/guid").get("isPermaLink"), "false")
             self.assertIn("&lt;script&gt;", root.findtext("channel/item/description"))
@@ -41,7 +43,7 @@ class FeedTests(unittest.TestCase):
 
     def test_empty_feed(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "rss.xml"
+            path = Path(directory) / "feed.rss"
             rss.write_feed(path, "Empty", "https://owner.github.io/", [], 100)
             self.assertEqual(ET.parse(path).findall("channel/item"), [])
 
@@ -49,7 +51,7 @@ class FeedTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(rss.parse_project(b'<!DOCTYPE rss><rss/>', "owner", "project"))
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "rss.xml"
+            path = Path(directory) / "feed.rss"
             item = next(rss.release_items("owner/project", [release(1)]))
             item["link"] = "https://example.org/release"
             rss.write_feed(path, "Project", "https://owner.github.io/project/", [item], 10)

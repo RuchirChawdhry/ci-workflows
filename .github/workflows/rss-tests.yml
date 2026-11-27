@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - scripts/rss.py
+      - scripts/release_feeds.py
+      - tests/test_release_feeds.py
+      - .github/workflows/sitemap-index.yml
       - tests/test_rss.py
       - .github/workflows/rss.yml
       - .github/workflows/rss-tests.yml
@@ -11,6 +14,9 @@ on:
     branches: [main]
     paths:
       - scripts/rss.py
+      - scripts/release_feeds.py
+      - tests/test_release_feeds.py
+      - .github/workflows/sitemap-index.yml
       - tests/test_rss.py
       - .github/workflows/rss.yml
       - .github/workflows/rss-tests.yml
@@ -28,3 +34,4 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s tests -p test_rss.py -v
+      - run: python3 -m unittest discover -s tests -p test_release_feeds.py -v
