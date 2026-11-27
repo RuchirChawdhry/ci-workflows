@@ -42,7 +42,14 @@ def validate(dist, origin):
         tree = ET.parse(dist / entry.text.removeprefix(origin))
         sitemap_urls.update(loc.text.rstrip("/") for loc in tree.findall("s:url/s:loc", NS))
     assert sitemap_urls == pages, (sitemap_urls, pages)
-    print(f"Validated {len(pages)} Markdown mirrors, HTML pages and sitemap URLs")
+    # Keep Astro's sitemap index and expose a flat, project-local sitemap as well.
+    ET.register_namespace("", NS["s"])
+    root = ET.Element(f"{{{NS['s']}}}urlset")
+    for url in sorted(sitemap_urls):
+        ET.SubElement(ET.SubElement(root, f"{{{NS['s']}}}url"), f"{{{NS['s']}}}loc").text = url + "/"
+    ET.ElementTree(root).write(dist / "sitemap.xml", encoding="utf-8", xml_declaration=True)
+    assert {loc.text.rstrip("/") for loc in ET.parse(dist / "sitemap.xml").findall("s:url/s:loc", NS)} == pages
+    print(f"Validated {len(pages)} Markdown mirrors, HTML pages and sitemap URLs; wrote sitemap.xml")
 
 
 if __name__ == "__main__":

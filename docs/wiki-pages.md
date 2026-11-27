@@ -2,7 +2,7 @@
 
 A reusable workflow builds the root `wiki/` Markdown directory into Starlight documentation, using the centrally locked Astro dependencies and shared stylesheet. Pages must start with an H1 and have hyphenated ASCII filenames. Home.md becomes the homepage; _Sidebar.md determines navigation order. Wiki links to other pages become absolute web or Markdown links; fenced code is preserved.
 
-The build publishes HTML, the standard Starlight sitemap, llms.txt, llms-full.txt and an index.md mirror beside each index.html. HTML advertises the mirror and the index using link relations. The build validates the links and HTML-only sitemap before upload. No duplicate authored documentation or caller Node configuration is required.
+The build publishes HTML, the standard Starlight sitemap and a flat `sitemap.xml`, llms.txt, llms-full.txt and an index.md mirror beside each index.html. HTML advertises the mirror and the index using link relations. The build validates the links and HTML-only sitemap before upload. No duplicate authored documentation or caller Node configuration is required.
 
 Call from a project workflow with:
 
