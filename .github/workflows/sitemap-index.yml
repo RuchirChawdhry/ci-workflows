@@ -2,6 +2,11 @@ name: Publish portfolio sitemap
 
 on:
   workflow_call:
+    inputs:
+      rss:
+        description: Include the portfolio RSS feed in the existing Pages deployment
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -357,6 +362,20 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci-workflows
           persist-credentials: false
+      - name: Generate portfolio RSS feed
+        if: ${{ inputs.rss }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .ci-workflows/scripts/rss.py portfolio --output dist/rss.xml --limit 200
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("dist/index.html")
+          page = path.read_text(encoding="utf-8")
+          page = page.replace("</head>", '<link rel="alternate" type="application/rss+xml" title="Project releases" href="/rss.xml"></head>', 1)
+          page = page.replace("</main>", '<p><a href="/rss.xml">Subscribe to project releases (RSS)</a></p></main>', 1)
+          path.write_text(page, encoding="utf-8")
+          PY
       - name: Generate and validate portfolio structured data
         env:
           GH_TOKEN: ${{ github.token }}
