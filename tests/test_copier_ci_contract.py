@@ -12,7 +12,7 @@ def test_copier_workflow_contract():
     )
     assert set(workflow["on"]) == {"workflow_call"}
     inputs = workflow["on"]["workflow_call"]["inputs"]
-    assert set(inputs) == {"profile", "copier-data", "artifact-suffix", "python-typecheck"}
+    assert set(inputs) == {"profile", "copier-data", "artifact-suffix", "python-typecheck", "redis-integration"}
     assert inputs["copier-data"]["default"] == "{}"
     assert inputs["artifact-suffix"]["default"] == ""
     assert inputs["profile"]["default"] == "python"

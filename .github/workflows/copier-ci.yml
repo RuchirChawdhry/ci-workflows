@@ -15,6 +15,10 @@ on:
         description: Run ty against generated Python source before pytest
         type: boolean
         default: false
+      redis-integration:
+        description: Install Redis for Python service integration tests on Ubuntu
+        type: boolean
+        default: false
       artifact-suffix:
         description: Unique suffix when validating several variants in one run
         type: string
@@ -77,6 +81,14 @@ jobs:
           version="$(tr -d '\r\n' < .python-version)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected an exact Python version in .python-version' >&2; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Install Redis for integration tests
+        if: inputs.redis-integration && inputs.profile == 'python'
+        run: |
+          if ! command -v redis-server >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y redis-server
+          fi
+          echo 'REQUIRE_REDIS_INTEGRATION=1' >> "$GITHUB_ENV"
       - name: Check generated Python project
         id: check_generated_python_project
         if: inputs.profile != 'chromium'

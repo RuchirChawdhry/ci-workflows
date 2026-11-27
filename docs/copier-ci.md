@@ -69,3 +69,6 @@ jobs:
 Set `python-typecheck: true` for generated Python projects that include `ty` and
 `pytest-benchmark` in their dev group. CI checks `src` with ty and executes benchmark
 tests without timing loops during ordinary validation.
+
+Set `redis-integration: true` on Ubuntu Python service variants to install Redis
+for integration tests. The generated tests start their own isolated Redis process.
