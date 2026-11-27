@@ -1,0 +1,30 @@
+name: RSS generator tests
+
+on:
+  pull_request:
+    paths:
+      - scripts/rss.py
+      - tests/test_rss.py
+      - .github/workflows/rss.yml
+      - .github/workflows/rss-tests.yml
+  push:
+    branches: [main]
+    paths:
+      - scripts/rss.py
+      - tests/test_rss.py
+      - .github/workflows/rss.yml
+      - .github/workflows/rss-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s tests -p test_rss.py -v
