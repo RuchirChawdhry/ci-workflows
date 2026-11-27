@@ -11,6 +11,8 @@ from mdformat.renderer import MDRenderer
 from mdformat_gfm import plugin as gfm
 
 PAGE_NAME = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
+
+
 def parser():
     md = MarkdownIt(renderer_cls=MDRenderer)
     md.options.update(mdformat={"wrap": "keep"}, store_labels=True,
