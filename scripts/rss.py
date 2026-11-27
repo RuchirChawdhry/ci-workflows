@@ -128,7 +128,7 @@ def parse_project(data, owner, name):
             raise ValueError(f"Unexpected release link: {item['link']}")
         if not item["title"] or not re.fullmatch(r"github-release:\d+", item["guid"]):
             raise ValueError("Missing title or invalid release GUID")
-        date(item)
+        item["pubDate"] = format_datetime(date(item), usegmt=True)
         # Treat third-party feed descriptions as text; preserve safe HTML from our own generator.
         item["description"] = html.escape(html.unescape(item["description"].replace("<br>", "\n"))).replace("\n", "<br>")
         item["category"] = name
