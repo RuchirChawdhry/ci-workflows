@@ -1,6 +1,6 @@
 # RSS feeds
 
-GitHub already publishes a native Atom feed at `https://github.com/OWNER/PROJECT/releases.atom`. Subscribe directly for an individual project; no workflow or Pages site is needed. The portfolio aggregator uses those native feeds. The optional custom project RSS workflow below still uses the Releases API and supports stable-only filtering.
+GitHub already publishes a native Atom feed at `https://github.com/OWNER/PROJECT/releases.atom`. Subscribe directly for an individual project; no workflow or Pages site is needed. The portfolio aggregator uses those native feeds. RSS and Atom serialization uses the standalone `feedgenerator` package, pinned in `scripts/feed-requirements.txt` and installed in an isolated uv environment. JSON Feed and OPML retain their existing standard-library serializers. The optional custom project RSS workflow below still uses the Releases API and supports stable-only filtering.
 
 ## Optional custom project websites
 
@@ -48,7 +48,7 @@ The existing `sitemap-index.yml` reusable workflow generates the following files
 
 Repository discovery is paginated and includes owner-owned public repositories even without Pages. Native feeds are fetched without sending credentials to github.com, with four concurrent workers. Empty or missing feeds are excluded from the subscription directory until they have releases. Redirects, malformed feeds and unexpected HTTP/network errors fail the build. The central feeds preserve native IDs, rendered HTML and authors; deduplicate by native ID; and retain the latest 200 entries. Sorting uses the published timestamp where available, otherwise the updated timestamp; RSS pubDate likewise falls back to updated. Atom and JSON retain the distinction. Native feed contents determine prerelease inclusion; no independent stable-only filtering or full-history guarantee is made. Existing RSS readers may see previously published releases again once because the older API-based IDs differ from native Atom IDs.
 
-All formats are generated from the same snapshot, on the existing portfolio schedule. The portfolio homepage advertises all three syndication formats and links to the directory. No project callers, additional credentials or dependencies are needed. For a project with no releases yet, its native URL can still be subscribed to directly. GitHub Pages controls response MIME types. Update existing subscriptions and autodiscovery links to `/feed.rss`; no `rss.xml` alias is published.
+All formats are generated from the same snapshot, on the existing portfolio schedule. The portfolio homepage advertises all three syndication formats and links to the directory. No changes to project callers or additional credentials are needed. The shared workflow installs feedgenerator automatically. For a project with no releases yet, its native URL can still be subscribed to directly. GitHub Pages controls response MIME types. Update existing subscriptions and autodiscovery links to `/feed.rss`; no `rss.xml` alias is published.
 
 ## Standalone reusable workflow
 
@@ -64,8 +64,8 @@ jobs:
       include-prereleases: false
 ```
 
-Artifact name: `rss-feed`, containing `feed.rss`. The consumer's build job must depend on `rss` and download the artifact into its site output directory. Portfolio mode is restricted to the public user-site repository and now aggregates native release feeds into the RSS artifact. The default GitHub token with `contents: read` suffices for public releases. No PAT, external service, or new Python dependency is required. Pin reviewed workflow refs for production.
+Artifact name: `rss-feed`, containing `feed.rss`. The consumer's build job must depend on `rss` and download the artifact into its site output directory. Portfolio mode is restricted to the public user-site repository and now aggregates native release feeds into the RSS artifact. The default GitHub token with `contents: read` suffices for public releases. No PAT or external service is required; uv installs the pinned feedgenerator dependency. Pin reviewed workflow refs for production.
 
 ## Verification
 
-Run `python3 -m unittest discover -s tests -p 'test*feeds.py' -v` and `python3 -m unittest discover -s tests -p test_rss.py -v`. Check the deployed project and root RSS URLs and subscribe in an RSS reader. GitHub Pages must already be configured in each caller.
+Run `uv run --no-project --with-requirements scripts/feed-requirements.txt python -m unittest discover -s tests -p test_release_feeds.py -v` and `uv run --no-project --with-requirements scripts/feed-requirements.txt python -m unittest discover -s tests -p test_rss.py -v`. Check the deployed project and root RSS URLs and subscribe in an RSS reader. GitHub Pages must already be configured in each caller.
