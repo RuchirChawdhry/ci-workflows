@@ -59,6 +59,12 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci-workflows
           persist-credentials: false
+      - name: Set up uv for feed generation
+        if: ${{ inputs.rss }}
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
       - name: Generate release RSS in Astro public directory
         if: ${{ inputs.rss }}
         env:
@@ -69,7 +75,7 @@ jobs:
           args=()
           if [[ "$PRERELEASES" == true ]]; then args+=(--include-prereleases); fi
           rm -f "$SITE_PATH/public/rss.xml"
-          python3 .ci-workflows/scripts/rss.py project --output "$SITE_PATH/public/feed.rss" "${args[@]}"
+          uv run --no-project --with-requirements .ci-workflows/scripts/feed-requirements.txt python .ci-workflows/scripts/rss.py project --output "$SITE_PATH/public/feed.rss" "${args[@]}"
       - name: Build Astro and upload Pages artifact
         uses: withastro/action@a8b97df764791eb61fbf3338ef713b0e61ae05c5 # v6
         with:

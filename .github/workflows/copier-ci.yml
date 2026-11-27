@@ -7,6 +7,22 @@ on:
         description: "python (CLI or service), winui, or chromium"
         type: string
         default: python
+      copier-data:
+        description: JSON or YAML mapping of Copier answers for this variant
+        type: string
+        default: '{}'
+      python-typecheck:
+        description: Run ty against generated Python source before pytest
+        type: boolean
+        default: false
+      redis-integration:
+        description: Install Redis for Python service integration tests on Ubuntu
+        type: boolean
+        default: false
+      artifact-suffix:
+        description: Unique suffix when validating several variants in one run
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -52,7 +68,11 @@ jobs:
           uv run --no-project --python "$COPIER_PYTHON" --with copier==9.14.1 --with pytest --with PyYAML pytest -q tests --junitxml="$REPORT_DIR/template.xml"
       - name: Render current template
         id: render_current_template
-        run: uv run --no-project --python "$COPIER_PYTHON" --with copier==9.14.1 copier copy --defaults --vcs-ref=HEAD . .ci-generated
+        env:
+          COPIER_DATA: ${{ inputs.copier-data }}
+        run: |
+          printf '%s\n' "$COPIER_DATA" > "$RUNNER_TEMP/copier-answers.yml"
+          uv run --no-project --python "$COPIER_PYTHON" --with copier==9.14.1 copier copy --defaults --vcs-ref=HEAD --data-file "$RUNNER_TEMP/copier-answers.yml" . .ci-generated
       - name: Read generated Python version
         id: python_version
         if: inputs.profile != 'chromium'
@@ -61,6 +81,14 @@ jobs:
           version="$(tr -d '\r\n' < .python-version)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected an exact Python version in .python-version' >&2; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Install Redis for integration tests
+        if: inputs.redis-integration && inputs.profile == 'python'
+        run: |
+          if ! command -v redis-server >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y redis-server
+          fi
+          echo 'REQUIRE_REDIS_INTEGRATION=1' >> "$GITHUB_ENV"
       - name: Check generated Python project
         id: check_generated_python_project
         if: inputs.profile != 'chromium'
@@ -69,7 +97,7 @@ jobs:
           project-path: .ci-generated
           python-version: ${{ steps.python_version.outputs.version }}
           setup-uv: 'false'
-          test-command: pytest -q --junitxml="$REPORT_DIR/generated-python.xml"
+          test-command: ${{ inputs.python-typecheck && 'ty check src && pytest -q --benchmark-disable --junitxml="$REPORT_DIR/generated-python.xml"' || 'pytest -q --junitxml="$REPORT_DIR/generated-python.xml"' }}
       - name: Build Python distributions
         id: build_python_distributions
         if: inputs.profile != 'chromium'
@@ -168,7 +196,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: copier-junit
+          name: copier-junit${{ inputs.artifact-suffix }}
           path: ${{ runner.temp }}/copier-reports/*.xml
           if-no-files-found: ignore
           retention-days: 7
