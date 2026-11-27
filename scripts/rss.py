@@ -1,4 +1,4 @@
-"""Build RSS 2.0 feeds from public GitHub releases and project Pages feeds."""
+"""Build RSS 2.0 feeds from public GitHub releases."""
 import argparse
 from datetime import datetime, timezone
 from email.utils import format_datetime, parsedate_to_datetime
@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
@@ -132,26 +131,6 @@ def parse_project(data, owner, name):
         yield item
 
 
-def portfolio_items(owner, token):
-    for repo in api_pages(f"users/{quote(owner)}/repos", token):
-        name = repo["name"]
-        if repo["private"] or not repo["has_pages"] or name.lower() == f"{owner.lower()}.github.io":
-            continue
-        url = pages_base(owner, name) + "rss.xml"
-        try:
-            data = get(url)
-        except HTTPError as error:
-            if error.code in {301, 302, 303, 307, 308, 404, 410}:
-                print(f"Skipping unavailable or redirected feed: {url}")
-                continue
-            raise
-        # GitHub Pages may serve a non-RSS fallback page with status 200.
-        if data.lstrip().lower().startswith((b"<!doctype html", b"<html")):
-            print(f"Skipping HTML fallback: {url}")
-            continue
-        yield from parse_project(data, owner, name)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("project", "portfolio"))
@@ -171,8 +150,12 @@ def main():
     if args.mode == "portfolio":
         if name.lower() != f"{owner.lower()}.github.io":
             raise ValueError("Portfolio mode must run in the owner's GitHub Pages user-site repository")
-        items = portfolio_items(owner, token)
-        title = f"{owner} — project releases"
+        from release_feeds import discover, rss_feed, sort_items
+        projects = discover(owner, token)
+        items = sort_items((item for project in projects for item in project["items"]), args.limit)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        rss_feed(args.output, base, f"{owner} — project releases", items)
+        return
     else:
         items = release_items(repository, api_pages(f"repos/{repository}/releases", token), args.include_prereleases)
         title = f"{name} releases"
