@@ -50,3 +50,18 @@ generated-project CI assertions.
 The Chromium template foundation is currently on its feature branch; integrate
 the root caller after that foundation is available. Do not use this workflow
 to deploy a service or publish a package.
+
+## Validate several Copier variants
+
+Call the same workflow for each profile using `copier-data` (a JSON or YAML answers
+mapping). Set a distinct `artifact-suffix` per caller in the same workflow run.
+The default empty mapping and suffix retain the original behavior.
+
+```yaml
+jobs:
+  minimal:
+    uses: RuchirChawdhry/ci-workflows/.github/workflows/copier-ci.yml@main
+    with:
+      copier-data: '{"enable_jobs": false}'
+      artifact-suffix: '-minimal'
+```

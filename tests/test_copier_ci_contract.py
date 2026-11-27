@@ -12,7 +12,9 @@ def test_copier_workflow_contract():
     )
     assert set(workflow["on"]) == {"workflow_call"}
     inputs = workflow["on"]["workflow_call"]["inputs"]
-    assert set(inputs) == {"profile"}
+    assert set(inputs) == {"profile", "copier-data", "artifact-suffix"}
+    assert inputs["copier-data"]["default"] == "{}"
+    assert inputs["artifact-suffix"]["default"] == ""
     assert inputs["profile"]["default"] == "python"
     assert workflow["permissions"] == {"contents": "read"}
     job = workflow["jobs"]["validate"]
@@ -37,6 +39,11 @@ def test_copier_workflow_contract():
     ):
         assert command in commands
     assert "--trust" not in commands
+    render = next(s for s in steps if s.get("id") == "render_current_template")
+    assert render["env"]["COPIER_DATA"] == "${{ inputs.copier-data }}"
+    assert '--data-file "$RUNNER_TEMP/copier-answers.yml"' in render["run"]
+    reports = next(s for s in steps if s.get("id") == "reports")
+    assert reports["with"]["name"] == "copier-junit${{ inputs.artifact-suffix }}"
 
 
 def test_version_setup_and_reports():
