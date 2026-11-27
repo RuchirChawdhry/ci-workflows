@@ -3,6 +3,14 @@ name: PowerShell module documentation
 on:
   workflow_call:
     inputs:
+      rss:
+        description: Generate a public release RSS feed alongside the website
+        type: boolean
+        default: false
+      rss-include-prereleases:
+        description: Include prereleases in RSS
+        type: boolean
+        default: false
       manifest-path:
         description: Relative path to the module .psd1 manifest
         type: string
@@ -119,6 +127,15 @@ jobs:
           set -euo pipefail
           npm ci --prefix "$RUNNER_TEMP/powershell-docs-site" --no-audit --no-fund
           npm --prefix "$RUNNER_TEMP/powershell-docs-site" run build
+      - name: Generate release RSS alongside built documentation
+        if: ${{ inputs.rss }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASES: ${{ inputs.rss-include-prereleases }}
+        run: |
+          args=()
+          if [[ "$PRERELEASES" == true ]]; then args+=(--include-prereleases); fi
+          python3 .ci-workflows/scripts/rss.py project --output "$RUNNER_TEMP/powershell-docs-site/dist/rss.xml" "${args[@]}"
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
