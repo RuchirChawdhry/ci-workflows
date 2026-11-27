@@ -30,7 +30,7 @@ jobs:
       publish: true
 ```
 
-Keep your existing site settings and deployment guards (including PR builds, if any). Set `rss-include-prereleases: true` only if wanted. Astro must use its default `public/` directory. The generated feed is published with the same site artifact, never as an RSS-only Pages deployment. Existing custom `public/rss.xml` is replaced when RSS is explicitly enabled. For autodiscovery, add a head link with `rel="alternate"`, `type="application/rss+xml"`, and the project's absolute feed URL in your site config. The URL is `https://OWNER.github.io/PROJECT/rss.xml`.
+Keep your existing site settings and deployment guards (including PR builds, if any). Set `rss-include-prereleases: true` only if wanted. Astro must use its default `public/` directory. The generated feed is published with the same site artifact, never as an RSS-only Pages deployment. The only generated RSS endpoint is `feed.rss`; the old `rss.xml` file is removed from the published build when RSS is enabled. For autodiscovery, add a head link with `rel="alternate"`, `type="application/rss+xml"`, and the project's absolute feed URL in your site config. The URL is `https://OWNER.github.io/PROJECT/feed.rss`.
 
 Scheduled refreshes run on the default branch and pick up release events even if there is no source push. A release-triggered workflow usually runs on a tag ref, which the existing deployment guards intentionally reject; do not bypass them.
 
@@ -45,11 +45,10 @@ The existing `sitemap-index.yml` reusable workflow generates the following files
 | `/feed.json` | JSON Feed 1.1 |
 | `/feeds.opml` | Individual project subscriptions |
 | `/feeds/` | Searchable, responsive HTML subscription directory |
-| `/rss.xml` | Compatibility copy of feed.rss |
 
 Repository discovery is paginated and includes owner-owned public repositories even without Pages. Native feeds are fetched without sending credentials to github.com, with four concurrent workers. Empty or missing feeds are excluded from the subscription directory until they have releases. Redirects, malformed feeds and unexpected HTTP/network errors fail the build. The central feeds preserve native IDs, rendered HTML and authors; deduplicate by native ID; and retain the latest 200 entries. Sorting uses the published timestamp where available, otherwise the updated timestamp; RSS pubDate likewise falls back to updated. Atom and JSON retain the distinction. Native feed contents determine prerelease inclusion; no independent stable-only filtering or full-history guarantee is made. Existing RSS readers may see previously published releases again once because the older API-based IDs differ from native Atom IDs.
 
-All formats are generated from the same snapshot, on the existing portfolio schedule. The portfolio homepage advertises all three syndication formats and links to the directory. No project callers, additional credentials or dependencies are needed. For a project with no releases yet, its native URL can still be subscribed to directly. GitHub Pages controls response MIME types; use `/rss.xml` if a client cannot handle the `.rss` extension.
+All formats are generated from the same snapshot, on the existing portfolio schedule. The portfolio homepage advertises all three syndication formats and links to the directory. No project callers, additional credentials or dependencies are needed. For a project with no releases yet, its native URL can still be subscribed to directly. GitHub Pages controls response MIME types. Update existing subscriptions and autodiscovery links to `/feed.rss`; no `rss.xml` alias is published.
 
 ## Standalone reusable workflow
 
@@ -65,7 +64,7 @@ jobs:
       include-prereleases: false
 ```
 
-Artifact name: `rss-feed`, containing `rss.xml`. The consumer's build job must depend on `rss` and download the artifact into its site output directory. Portfolio mode is restricted to the public user-site repository and now aggregates native release feeds into the RSS artifact. The default GitHub token with `contents: read` suffices for public releases. No PAT, external service, or new Python dependency is required. Pin reviewed workflow refs for production.
+Artifact name: `rss-feed`, containing `feed.rss`. The consumer's build job must depend on `rss` and download the artifact into its site output directory. Portfolio mode is restricted to the public user-site repository and now aggregates native release feeds into the RSS artifact. The default GitHub token with `contents: read` suffices for public releases. No PAT, external service, or new Python dependency is required. Pin reviewed workflow refs for production.
 
 ## Verification
 

@@ -21,17 +21,20 @@ ATOM = b'''<feed xmlns="http://www.w3.org/2005/Atom">
 
 
 class NativeFeedTests(unittest.TestCase):
-    def test_formats_and_alias(self):
+    def test_formats_without_legacy_alias(self):
         items = feeds.parse(ATOM, "owner", "project")
         project = dict(name="project", url="https://github.com/owner/project", description="<unsafe>", items=items + items)
         with tempfile.TemporaryDirectory() as temp:
             out = Path(temp)
+            (out / "rss.xml").write_text("obsolete feed")
             feeds.generate(out, "owner", [project], 200)
             rss = ET.parse(out / "feed.rss")
             self.assertEqual(rss.findtext("channel/item/description"), "<p>Hello &amp; fixes</p>")
             self.assertEqual(rss.findtext("channel/item/pubDate"), "Sun, 22 Nov 2026 11:45:15 GMT")
             self.assertEqual(len(rss.findall("channel/item")), 1)
-            self.assertEqual((out / "rss.xml").read_bytes(), (out / "feed.rss").read_bytes())
+            self.assertFalse((out / "rss.xml").exists())
+            self.assertEqual(rss.find("channel/" + feeds.A + "link").get("href"),
+                             "https://owner.github.io/feed.rss")
             atom = ET.parse(out / "feed.atom")
             self.assertEqual(atom.findtext(feeds.A + "entry/" + feeds.A + "id"), items[0]["id"])
             self.assertIsNone(atom.find(feeds.A + "entry/" + feeds.A + "published"))
@@ -54,13 +57,13 @@ class NativeFeedTests(unittest.TestCase):
             writers = (
                 lambda: feeds.rss_feed(out / "feed.rss", base, "Project", items),
                 lambda: feeds.atom_feed(out / "feed.atom", base, "Project", items),
-                lambda: project_rss.write_feed(out / "rss.xml", "Project", base, [legacy], 10),
+                lambda: project_rss.write_feed(out / "project.feed.rss", "Project", base, [legacy], 10),
             )
             for order in (writers, tuple(reversed(writers))):
                 with patch.object(ET, "register_namespace", side_effect=AssertionError("Global namespace mutation")):
                     for write in order:
                         write()
-                for filename in ("feed.rss", "rss.xml"):
+                for filename in ("feed.rss", "project.feed.rss"):
                     root = ET.parse(out / filename).getroot()
                     self.assertEqual(root.tag, "rss")
                     self.assertEqual(len(root.findall("channel/item")), 1)
@@ -95,6 +98,7 @@ class NativeFeedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             out = Path(temp)
             feeds.generate(out, "owner", [], 200)
+            self.assertFalse((out / "rss.xml").exists())
             self.assertEqual(json.loads((out / "feed.json").read_text())["items"], [])
             self.assertEqual(ET.parse(out / "feeds.opml").findall("body/outline"), [])
 

@@ -68,7 +68,8 @@ jobs:
         run: |
           args=()
           if [[ "$PRERELEASES" == true ]]; then args+=(--include-prereleases); fi
-          python3 .ci-workflows/scripts/rss.py project --output "$SITE_PATH/public/rss.xml" "${args[@]}"
+          rm -f "$SITE_PATH/public/rss.xml"
+          python3 .ci-workflows/scripts/rss.py project --output "$SITE_PATH/public/feed.rss" "${args[@]}"
       - name: Build Astro and upload Pages artifact
         uses: withastro/action@a8b97df764791eb61fbf3338ef713b0e61ae05c5 # v6
         with:

@@ -212,12 +212,12 @@ def generate(output, owner, projects, limit):
     title = f"{owner} — project releases"
     items = sort_items((item for project in projects for item in project["items"]), limit)
     rss_feed(output / "feed.rss", base, title, items)
-    (output / "rss.xml").write_bytes((output / "feed.rss").read_bytes())
+    (output / "rss.xml").unlink(missing_ok=True)
     atom_feed(output / "feed.atom", base, title, items)
     json_feed(output / "feed.json", base, title, items)
     opml(output / "feeds.opml", title, projects)
     directory(output / "feeds/index.html", title, projects)
-    print(f"Generated five feed files and directory: {len(projects)} projects, {len(items)} entries")
+    print(f"Generated four feed files and directory: {len(projects)} projects, {len(items)} entries")
 
 
 def main():

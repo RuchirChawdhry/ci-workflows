@@ -135,7 +135,8 @@ jobs:
         run: |
           args=()
           if [[ "$PRERELEASES" == true ]]; then args+=(--include-prereleases); fi
-          python3 .ci-workflows/scripts/rss.py project --output "$RUNNER_TEMP/powershell-docs-site/dist/rss.xml" "${args[@]}"
+          rm -f "$RUNNER_TEMP/powershell-docs-site/dist/rss.xml"
+          python3 .ci-workflows/scripts/rss.py project --output "$RUNNER_TEMP/powershell-docs-site/dist/feed.rss" "${args[@]}"
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:

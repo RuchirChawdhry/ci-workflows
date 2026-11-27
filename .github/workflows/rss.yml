@@ -39,10 +39,10 @@ jobs:
         run: |
           args=()
           if [[ "$PRERELEASES" == true ]]; then args+=(--include-prereleases); fi
-          python3 scripts/rss.py "$MODE" --output feed/rss.xml --limit "$LIMIT" "${args[@]}"
+          python3 scripts/rss.py "$MODE" --output feed/feed.rss --limit "$LIMIT" "${args[@]}"
       - name: Upload RSS artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rss-feed
-          path: feed/rss.xml
+          path: feed/feed.rss
           if-no-files-found: error

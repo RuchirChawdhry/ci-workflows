@@ -86,7 +86,7 @@ def write_feed(output, title, base, items, limit):
     for name, value in {"title": title, "link": base, "description": f"Published updates for {title}"}.items():
         ET.SubElement(channel, name).text = clean(value)
     ET.SubElement(channel, "generator").text = "ci-workflows RSS"
-    ET.SubElement(channel, "atom:link", href=base + "rss.xml", rel="self", type="application/rss+xml")
+    ET.SubElement(channel, "atom:link", href=base + "feed.rss", rel="self", type="application/rss+xml")
     selected = select(items, limit)
     if selected:
         ET.SubElement(channel, "lastBuildDate").text = format_datetime(date(selected[0]), usegmt=True)
