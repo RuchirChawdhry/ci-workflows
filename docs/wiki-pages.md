@@ -21,3 +21,7 @@ See [structured data generation and overrides](structured-data.md) for the share
 ## Optional landing page
 
 Place `_Site.json` in `wiki/` with `{"title":"repository-name","landing":true}` to use a feature-card homepage within the standard Starlight documentation layout (with navigation and table-of-contents sidebars). In Home.md, write an H1, introductory text, a fenced quick-start command, and a `## Highlights` section containing consecutive `- **Title**: Description` lines. The generator renders that list as responsive feature cards on the website while keeping the wiki and Markdown mirrors as ordinary Markdown. Retain documentation and source links in Home.md. Other pages remain unchanged.
+
+## Markdown processing
+
+Wiki links are parsed with `markdown-it-py` and rendered back to Markdown with `mdformat` and its GFM extension. Code spans, fenced blocks, images, external links, tables and task lists are preserved semantically; formatting in generated Markdown may be normalized. The shared workflow installs the pinned dependencies with uv. Authored wiki files are not modified.

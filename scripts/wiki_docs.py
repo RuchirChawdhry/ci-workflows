@@ -4,34 +4,54 @@ import html
 import json
 from pathlib import Path
 import re
+from urllib.parse import urlsplit
+
+from markdown_it import MarkdownIt
+from mdformat.renderer import MDRenderer
+from mdformat_gfm import plugin as gfm
 
 PAGE_NAME = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
-LINK = re.compile(r"(?<!!)\[([^\]\n]+)\]\(([A-Za-z0-9-]+)(?:\.md)?(#[^\s)]+)?\)")
+
+
+def parser():
+    md = MarkdownIt(renderer_cls=MDRenderer)
+    md.options.update(mdformat={"wrap": "keep"}, store_labels=True,
+                      parser_extension=[gfm], codeformatters={})
+    gfm.update_mdit(md)
+    return md
+
+
+def link_tokens(tokens):
+    for token in tokens:
+        if token.type == "link_open":
+            yield token
+        if token.children:
+            yield from link_tokens(token.children)
+
+
+def wiki_target(href):
+    url = urlsplit(href)
+    name = url.path.removesuffix(".md")
+    if not (url.scheme or url.netloc or url.query) and PAGE_NAME.fullmatch(name):
+        return name, ("#" + url.fragment if url.fragment else "")
+    return None
 
 
 def rewrite(text, paths, origin, markdown):
-    lines = []
-    fence = None
-    for line in text.splitlines():
-        marker = re.match(r"^\s{0,3}(\x60{3,}|~{3,})", line)
-        if marker:
-            token = marker.group(1)
-            if fence is None:
-                fence = token
-            elif token[0] == fence[0] and len(token) >= len(fence):
-                fence = None
-            lines.append(line)
+    md = parser()
+    env = {}
+    tokens = md.parse(text, env)
+    for token in link_tokens(tokens):
+        target = wiki_target(token.attrGet("href"))
+        if target is None:
             continue
-        if fence is None:
-            def replace(match):
-                name, fragment = match.group(2), match.group(3) or ""
-                if name not in paths:
-                    raise ValueError(f"Unknown wiki page: {name}")
-                route = paths[name]
-                return f"[{match.group(1)}]({origin}{route}{'index.md' if markdown else ''}{fragment})"
-            line = LINK.sub(replace, line)
-        lines.append(line)
-    return "\n".join(lines).strip() + "\n"
+        name, fragment = target
+        if name not in paths:
+            raise ValueError(f"Unknown wiki page: {name}")
+        token.attrSet("href", f"{origin}{paths[name]}{'index.md' if markdown else ''}{fragment}")
+        # Rewritten reference links become inline links; image references remain untouched.
+        token.meta.pop("label", None)
+    return md.renderer.render(tokens, md.options, env)
 
 
 def site_settings(wiki):
@@ -66,7 +86,10 @@ def prepare(wiki, site, origin, repo_url, description):
     sidebar = wiki / "_Sidebar.md"
     order = ["Home"]
     if sidebar.is_file():
-        order.extend(m.group(2) for m in LINK.finditer(sidebar.read_text()) if m.group(2) in files)
+        for token in link_tokens(parser().parse(sidebar.read_text(encoding="utf-8"))):
+            target = wiki_target(token.attrGet("href"))
+            if target and target[0] in files:
+                order.append(target[0])
     order = list(dict.fromkeys([*order, *files]))
     content = site / "src/content/docs"
     public = site / "public"
