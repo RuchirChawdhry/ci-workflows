@@ -1,4 +1,5 @@
 import json
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 import sys
 import tempfile
@@ -30,7 +31,9 @@ class NativeFeedTests(unittest.TestCase):
             feeds.generate(out, "owner", [project], 200)
             rss = ET.parse(out / "feed.rss")
             self.assertEqual(rss.findtext("channel/item/description"), "<p>Hello &amp; fixes</p>")
-            self.assertEqual(rss.findtext("channel/item/pubDate"), "Sun, 22 Nov 2026 11:45:15 GMT")
+            self.assertEqual(parsedate_to_datetime(rss.findtext("channel/item/pubDate")), items[0]["updated"])
+            self.assertEqual(rss.find("channel/item/guid").get("isPermaLink"), "false")
+            self.assertEqual(rss.findtext("channel/item/{http://purl.org/dc/elements/1.1/}creator"), "bot")
             self.assertEqual(len(rss.findall("channel/item")), 1)
             self.assertFalse((out / "rss.xml").exists())
             self.assertEqual(rss.find("channel/" + feeds.A + "link").get("href"),
@@ -38,6 +41,8 @@ class NativeFeedTests(unittest.TestCase):
             atom = ET.parse(out / "feed.atom")
             self.assertEqual(atom.findtext(feeds.A + "entry/" + feeds.A + "id"), items[0]["id"])
             self.assertIsNone(atom.find(feeds.A + "entry/" + feeds.A + "published"))
+            self.assertEqual(atom.findtext(feeds.A + "entry/" + feeds.A + "content"), items[0]["content_html"])
+            self.assertEqual(feeds.timestamp(atom.findtext(feeds.A + "entry/" + feeds.A + "updated")), items[0]["updated"])
             data = json.loads((out / "feed.json").read_text())
             self.assertEqual(data["items"][0]["date_modified"], "2026-11-22T11:45:15Z")
             self.assertNotIn("date_published", data["items"][0])

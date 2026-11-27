@@ -2,7 +2,6 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from email.utils import format_datetime
 from html import escape
 import json
 import os
@@ -11,7 +10,9 @@ from urllib.error import HTTPError
 from urllib.parse import quote, urlsplit
 import xml.etree.ElementTree as ET
 
-from rss import api_pages, get, MAX_BYTES
+from feedgenerator import Atom1Feed, Rss201rev2Feed
+
+from rss import api_pages, get, MAX_BYTES, write_syndication
 
 ATOM = "http://www.w3.org/2005/Atom"
 A = f"{{{ATOM}}}"
@@ -119,38 +120,25 @@ def fields(node, values):
 
 
 def rss_feed(path, base, title, items):
-    root = ET.Element("rss", {"version": "2.0", "xmlns:atom": ATOM})
-    channel = ET.SubElement(root, "channel")
-    fields(channel, dict(title=title, link=base, description="Public GitHub project release updates"))
-    ET.SubElement(channel, "atom:link", href=base + "feed.rss", rel="self", type="application/rss+xml")
-    if items:
-        fields(channel, dict(lastBuildDate=format_datetime(max(item["updated"] for item in items), usegmt=True)))
+    feed = Rss201rev2Feed(title=title, link=base,
+                         description="Public GitHub project release updates",
+                         feed_url=base + "feed.rss")
     for item in items:
-        node = ET.SubElement(channel, "item")
-        fields(node, dict(title=item["title"], link=item["url"], description=item["content_html"],
-                          category=item["project"], pubDate=format_datetime(item["published"] or item["updated"], usegmt=True)))
-        ET.SubElement(node, "guid", isPermaLink="false").text = item["id"]
-    write_xml(path, root)
+        feed.add_item(title=item["title"], link=item["url"], description=item["content_html"],
+                      author_name=item["author"], categories=[item["project"]],
+                      unique_id=item["id"], unique_id_is_permalink=False,
+                      pubdate=item["published"] or item["updated"], updateddate=item["updated"])
+    write_syndication(path, feed)
 
 
 def atom_feed(path, base, title, items):
-    # Scope the default namespace to this document, not the process.
-    root = ET.Element("feed", xmlns=ATOM)
-    updated = max((item["updated"] for item in items), default=datetime(1970, 1, 1, tzinfo=timezone.utc))
-    fields(root, dict(id=base + "feed.atom", title=title, updated=iso(updated)))
-    ET.SubElement(root, "link", rel="self", href=base + "feed.atom", type="application/atom+xml")
-    ET.SubElement(root, "link", rel="alternate", href=base + "feeds/")
-    fields(ET.SubElement(root, "author"), dict(name=title))
+    feed = Atom1Feed(title=title, link=base + "feeds/", description="Public GitHub project release updates",
+                     feed_url=base + "feed.atom", feed_guid=base + "feed.atom", author_name=title)
     for item in items:
-        node = ET.SubElement(root, "entry")
-        fields(node, dict(id=item["id"], title=item["title"], updated=iso(item["updated"])))
-        if item["published"]:
-            fields(node, dict(published=iso(item["published"])))
-        ET.SubElement(node, "link", rel="alternate", href=item["url"])
-        ET.SubElement(node, "category", term=item["project"])
-        fields(ET.SubElement(node, "author"), dict(name=item["author"]))
-        ET.SubElement(node, "content", type="html").text = item["content_html"]
-    write_xml(path, root)
+        feed.add_item(title=item["title"], link=item["url"], description=None, content=item["content_html"],
+                      author_name=item["author"], categories=[item["project"]], unique_id=item["id"],
+                      pubdate=item["published"], updateddate=item["updated"])
+    write_syndication(path, feed)
 
 
 def json_feed(path, base, title, items):

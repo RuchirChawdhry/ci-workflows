@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - scripts/rss.py
+      - scripts/feed-requirements.txt
       - scripts/release_feeds.py
       - tests/test_release_feeds.py
       - .github/workflows/sitemap-index.yml
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - scripts/rss.py
+      - scripts/feed-requirements.txt
       - scripts/release_feeds.py
       - tests/test_release_feeds.py
       - .github/workflows/sitemap-index.yml
@@ -33,5 +35,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: python3 -m unittest discover -s tests -p test_rss.py -v
-      - run: python3 -m unittest discover -s tests -p test_release_feeds.py -v
+      - name: Set up uv for feed generation
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: latest-known
+          enable-cache: false
+      - run: uv run --no-project --with-requirements scripts/feed-requirements.txt python -m unittest discover -s tests -p test_rss.py -v
+      - run: uv run --no-project --with-requirements scripts/feed-requirements.txt python -m unittest discover -s tests -p test_release_feeds.py -v

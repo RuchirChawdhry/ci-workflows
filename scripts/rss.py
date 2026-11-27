@@ -11,6 +11,8 @@ from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
 
+from feedgenerator import Rss201rev2Feed
+
 ATOM = "http://www.w3.org/2005/Atom"
 MAX_BYTES = 10_000_000
 
@@ -80,29 +82,32 @@ def select(items, limit):
     return sorted(unique.values(), key=lambda item: (date(item), item["guid"]), reverse=True)[:limit]
 
 
-def write_feed(output, title, base, items, limit):
-    root = ET.Element("rss", {"version": "2.0", "xmlns:atom": ATOM})
-    channel = ET.SubElement(root, "channel")
-    for name, value in {"title": title, "link": base, "description": f"Published updates for {title}"}.items():
-        ET.SubElement(channel, name).text = clean(value)
-    ET.SubElement(channel, "generator").text = "ci-workflows RSS"
-    ET.SubElement(channel, "atom:link", href=base + "feed.rss", rel="self", type="application/rss+xml")
-    selected = select(items, limit)
-    if selected:
-        ET.SubElement(channel, "lastBuildDate").text = format_datetime(date(selected[0]), usegmt=True)
-    for item in selected:
-        node = ET.SubElement(channel, "item")
-        for field in ("title", "link", "description", "pubDate", "category", "guid"):
-            attrs = {"isPermaLink": "false"} if field == "guid" else {}
-            ET.SubElement(node, field, attrs).text = clean(item[field])
-    ET.indent(root)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+class ProjectRssFeed(Rss201rev2Feed):
+    def add_root_elements(self, handler):
+        super().add_root_elements(handler)
+        handler.addQuickElement("generator", "ci-workflows RSS")
+
+
+def write_syndication(output, feed):
+    data = feed.writeString("utf-8").encode("utf-8")
     if len(data) > MAX_BYTES:
         raise ValueError("Generated feed exceeds size limit")
     ET.fromstring(data)
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(data)
-    print(f"Generated {output}: {len(selected)} items")
+
+
+def write_feed(output, title, base, items, limit):
+    feed = ProjectRssFeed(title=clean(title), link=base,
+                          description=f"Published updates for {clean(title)}",
+                          feed_url=base + "feed.rss")
+    for item in select(items, limit):
+        feed.add_item(title=clean(item["title"]), link=item["link"],
+                      description=clean(item["description"]), pubdate=date(item),
+                      categories=[clean(item["category"])], unique_id=item["guid"],
+                      unique_id_is_permalink=False)
+    write_syndication(output, feed)
+    print(f"Generated {output}: {feed.num_items()} items")
 
 
 def parse_project(data, owner, name):
@@ -123,7 +128,7 @@ def parse_project(data, owner, name):
             raise ValueError(f"Unexpected release link: {item['link']}")
         if not item["title"] or not re.fullmatch(r"github-release:\d+", item["guid"]):
             raise ValueError("Missing title or invalid release GUID")
-        date(item)
+        item["pubDate"] = format_datetime(date(item), usegmt=True)
         # Treat third-party feed descriptions as text; preserve safe HTML from our own generator.
         item["description"] = html.escape(html.unescape(item["description"].replace("<br>", "\n"))).replace("\n", "<br>")
         item["category"] = name
