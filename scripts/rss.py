@@ -12,7 +12,6 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
 
 ATOM = "http://www.w3.org/2005/Atom"
-ET.register_namespace("atom", ATOM)
 MAX_BYTES = 10_000_000
 
 
@@ -82,12 +81,12 @@ def select(items, limit):
 
 
 def write_feed(output, title, base, items, limit):
-    root = ET.Element("rss", version="2.0")
+    root = ET.Element("rss", {"version": "2.0", "xmlns:atom": ATOM})
     channel = ET.SubElement(root, "channel")
     for name, value in {"title": title, "link": base, "description": f"Published updates for {title}"}.items():
         ET.SubElement(channel, name).text = clean(value)
     ET.SubElement(channel, "generator").text = "ci-workflows RSS"
-    ET.SubElement(channel, f"{{{ATOM}}}link", href=base + "rss.xml", rel="self", type="application/rss+xml")
+    ET.SubElement(channel, "atom:link", href=base + "rss.xml", rel="self", type="application/rss+xml")
     selected = select(items, limit)
     if selected:
         ET.SubElement(channel, "lastBuildDate").text = format_datetime(date(selected[0]), usegmt=True)

@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import release_feeds as feeds
+import rss as project_rss
 
 ATOM = b'''<feed xmlns="http://www.w3.org/2005/Atom">
 <title>Releases</title><id>urn:feed</id><updated>2026-11-22T16:37:40+05:30</updated>
@@ -40,6 +41,33 @@ class NativeFeedTests(unittest.TestCase):
             self.assertEqual(ET.parse(out / "feeds.opml").find("body/outline").get("xmlUrl"),
                              "https://github.com/owner/project/releases.atom")
             self.assertIn("&lt;unsafe&gt;", (out / "feeds/index.html").read_text())
+
+    def test_xml_writers_are_namespace_isolated(self):
+        items = feeds.parse(ATOM, "owner", "project")
+        base = "https://owner.github.io/"
+        item = items[0]
+        legacy = dict(title=item["title"], link=item["url"], description=item["content_html"],
+                      guid="github-release:1", category="project",
+                      pubDate="Sun, 22 Nov 2026 11:45:15 GMT")
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            writers = (
+                lambda: feeds.rss_feed(out / "feed.rss", base, "Project", items),
+                lambda: feeds.atom_feed(out / "feed.atom", base, "Project", items),
+                lambda: project_rss.write_feed(out / "rss.xml", "Project", base, [legacy], 10),
+            )
+            for order in (writers, tuple(reversed(writers))):
+                with patch.object(ET, "register_namespace", side_effect=AssertionError("Global namespace mutation")):
+                    for write in order:
+                        write()
+                for filename in ("feed.rss", "rss.xml"):
+                    root = ET.parse(out / filename).getroot()
+                    self.assertEqual(root.tag, "rss")
+                    self.assertEqual(len(root.findall("channel/item")), 1)
+                    self.assertIsNotNone(root.find("channel/" + feeds.A + "link"))
+                root = ET.parse(out / "feed.atom").getroot()
+                self.assertEqual(root.tag, feeds.A + "feed")
+                self.assertEqual(len(root.findall(feeds.A + "entry")), 1)
 
     def test_no_pages_required_and_private_excluded(self):
         repos = [dict(name="project", private=False, has_pages=False, owner=dict(login="owner")),

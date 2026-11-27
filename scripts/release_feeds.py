@@ -113,17 +113,16 @@ def write_xml(path, root):
     path.write_bytes(data)
 
 
-def fields(node, values, namespace=""):
+def fields(node, values):
     for tag, value in values.items():
-        ET.SubElement(node, namespace + tag).text = value
+        ET.SubElement(node, tag).text = value
 
 
 def rss_feed(path, base, title, items):
-    ET.register_namespace("atom", ATOM)
-    root = ET.Element("rss", version="2.0")
+    root = ET.Element("rss", {"version": "2.0", "xmlns:atom": ATOM})
     channel = ET.SubElement(root, "channel")
     fields(channel, dict(title=title, link=base, description="Public GitHub project release updates"))
-    ET.SubElement(channel, A + "link", href=base + "feed.rss", rel="self", type="application/rss+xml")
+    ET.SubElement(channel, "atom:link", href=base + "feed.rss", rel="self", type="application/rss+xml")
     if items:
         fields(channel, dict(lastBuildDate=format_datetime(max(item["updated"] for item in items), usegmt=True)))
     for item in items:
@@ -135,22 +134,22 @@ def rss_feed(path, base, title, items):
 
 
 def atom_feed(path, base, title, items):
-    ET.register_namespace("", ATOM)
-    root = ET.Element(A + "feed")
+    # Scope the default namespace to this document, not the process.
+    root = ET.Element("feed", xmlns=ATOM)
     updated = max((item["updated"] for item in items), default=datetime(1970, 1, 1, tzinfo=timezone.utc))
-    fields(root, dict(id=base + "feed.atom", title=title, updated=iso(updated)), A)
-    ET.SubElement(root, A + "link", rel="self", href=base + "feed.atom", type="application/atom+xml")
-    ET.SubElement(root, A + "link", rel="alternate", href=base + "feeds/")
-    fields(ET.SubElement(root, A + "author"), dict(name=title), A)
+    fields(root, dict(id=base + "feed.atom", title=title, updated=iso(updated)))
+    ET.SubElement(root, "link", rel="self", href=base + "feed.atom", type="application/atom+xml")
+    ET.SubElement(root, "link", rel="alternate", href=base + "feeds/")
+    fields(ET.SubElement(root, "author"), dict(name=title))
     for item in items:
-        node = ET.SubElement(root, A + "entry")
-        fields(node, dict(id=item["id"], title=item["title"], updated=iso(item["updated"])), A)
+        node = ET.SubElement(root, "entry")
+        fields(node, dict(id=item["id"], title=item["title"], updated=iso(item["updated"])))
         if item["published"]:
-            fields(node, dict(published=iso(item["published"])), A)
-        ET.SubElement(node, A + "link", rel="alternate", href=item["url"])
-        ET.SubElement(node, A + "category", term=item["project"])
-        fields(ET.SubElement(node, A + "author"), dict(name=item["author"]), A)
-        ET.SubElement(node, A + "content", type="html").text = item["content_html"]
+            fields(node, dict(published=iso(item["published"])))
+        ET.SubElement(node, "link", rel="alternate", href=item["url"])
+        ET.SubElement(node, "category", term=item["project"])
+        fields(ET.SubElement(node, "author"), dict(name=item["author"]))
+        ET.SubElement(node, "content", type="html").text = item["content_html"]
     write_xml(path, root)
 
 
