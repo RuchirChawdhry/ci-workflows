@@ -29,10 +29,12 @@ jobs:
           version: latest-known
           enable-cache: false
       - name: Install Python
+        run: uv python install 3.14.7
+      - name: Run contract tests
         run: >
           uv run --no-project --python 3.14.7
           --with-requirements scripts/markdown-requirements.txt
           --with-requirements scripts/feed-requirements.txt
           --with pytest
           --with PyYAML
-          pytest -q testsrun: uv python install 3.14.7
+          pytest -q tests
