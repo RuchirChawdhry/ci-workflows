@@ -362,18 +362,18 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci-workflows
           persist-credentials: false
-      - name: Generate portfolio RSS feed
+      - name: Generate portfolio subscription feeds
         if: ${{ inputs.rss }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 .ci-workflows/scripts/rss.py portfolio --output dist/rss.xml --limit 200
+          python3 .ci-workflows/scripts/release_feeds.py --output dist --limit 200
           python3 - <<'PY'
           from pathlib import Path
           path = Path("dist/index.html")
           page = path.read_text(encoding="utf-8")
-          page = page.replace("</head>", '<link rel="alternate" type="application/rss+xml" title="Project releases" href="/rss.xml"></head>', 1)
-          page = page.replace("</main>", '<p><a href="/rss.xml">Subscribe to project releases (RSS)</a></p></main>', 1)
+          page = page.replace("</head>", '<link rel="alternate" type="application/rss+xml" title="Project releases" href="/feed.rss"><link rel="alternate" type="application/atom+xml" title="Project releases" href="/feed.atom"><link rel="alternate" type="application/feed+json" title="Project releases" href="/feed.json"></head>', 1)
+          page = page.replace("</main>", '<p><a href="/feeds/">Subscribe to project releases</a> · <a href="/feed.rss">RSS</a> · <a href="/feed.atom">Atom</a> · <a href="/feeds.opml">OPML</a></p></main>', 1)
           path.write_text(page, encoding="utf-8")
           PY
       - name: Generate and validate portfolio structured data
